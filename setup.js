@@ -10,8 +10,6 @@ import { cfgOtherSetup } from "./js/details/config-details.js";
 import { customCardSetup } from "./js/custom-setups/card-setup.js";
 import { customConfigSetup } from "./js/custom-setups/config-setup.js";
 
-Hallo
-
 export let sport;
 export let dataStorage;
 export let cfgSportCustomSetup;
