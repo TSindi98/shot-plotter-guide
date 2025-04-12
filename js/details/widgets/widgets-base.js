@@ -76,24 +76,27 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
         .attr("class", cfgDetails.detailClass + " even-width")
         .attr("id", id);
     div.append("h3").text(title).attr("class", "center");
-    const timer = new Tock({
-        countdown: countdown,
-        interval: 10,
-        callback: () => {
-            let t = timer.lap();
-            let min = d3
-                .select("#" + id)
-                .select("input")
-                .property(
-                    "value",
-                    `${parseInt(t / 60000)
-                        .toString()
-                        .padStart(1, "0")}:${parseInt((t % 60000) / 1000)
-                        .toString()
-                        .padStart(2, "0")}`
-                );
-        },
+    // Füge ein Eingabefeld hinzu, um die Zeit anzuzeigen
+    div.append("input")
+        .attr("type", "text")
+        .attr("readonly", true) // Nur Lesezugriff
+        .attr("value", "00:00"); // Standardwert
+
+    const videoElement = document.getElementById('gameVideo'); // Das Video-Element
+
+    // Event-Listener für die Zeitaktualisierung
+    videoElement.addEventListener('timeupdate', function() {
+        const currentTime = videoElement.currentTime; // Aktueller Zeitstempel des Videos
+        const formattedTime = formatTime(currentTime); // Zeit formatieren
+        d3.select("#" + id).select("input").property("value", formattedTime); // Aktualisiere das Widget
     });
+
+    // Hilfsfunktion zum Formatieren der Zeit
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; // Format: mm:ss
+
     let text = div.append("div").attr("class", "time-widget position-relative");
     text.append("input")
         .attr("type", "text")
@@ -138,6 +141,7 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
         })
         .append("i")
         .attr("class", "bi bi-play-fill");
+    }
 }
 
 export {

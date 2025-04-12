@@ -126,10 +126,9 @@ function createShotFromEvent(e, point1) {
                     .property("value");
                 break;
             case "time":
-                rowData[col.id] = d3
-                    .select("#" + col.id)
-                    .select("input")
-                    .property("value");
+                // Hier den Zeitstempel des Videos erfassen
+                const timestamp = document.getElementById('gameVideo').currentTime; // Aktueller Zeitstempel des Videos
+                rowData[col.id] = timestamp; // Zeitstempel speichern
                 break;
             case "team":
                 specialData["teamColor"] = d3
