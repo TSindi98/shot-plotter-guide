@@ -51,7 +51,7 @@ function createDropdown(selectId, { id, title, options }) {
     let div = d3
         .select(selectId)
         .append("div")
-        .attr("class", cfgDetails.detailClass + " " + "even-width")
+        .attr("class", cfgDetails.detailClass + " even-width")
         .attr("id", id);
 
     div.append("h3").text(title).attr("class", "center");
@@ -61,13 +61,47 @@ function createDropdown(selectId, { id, title, options }) {
         .append("select")
         .attr("id", id + "-select")
         .attr("class", "select2");
-    for (let option of options) {
+
+    options.forEach((option, index) => {
+        const optionText = option.shortcut
+            ? `${option.value} (${option.shortcut})`
+            : option.value;
+
         select
             .append("option")
-            .text(option.value)
+            .text(optionText)
+            .attr("value", option.value)
             .attr("selected", option.selected);
-    }
+
+        console.log(`Option ${index}:`, option);
+
+        if (option.shortcut) {
+            console.log(`  → Registering shortcut: ${option.shortcut} for value: ${option.value}`);
+            shortcutToDropdown.set(option.shortcut, {
+                selectId: `${id}-select`,
+                value: option.value,
+            });
+        } else {
+            console.warn(`  ⚠️ Option ${index} has no shortcut`);
+        }
+    });
 }
+
+// Event-Listener für Tastaturbefehle
+document.addEventListener('keydown', function(event) {
+    options.forEach((option) => {
+        // Überprüfen, ob der Shortcut gedrückt wurde
+        if (event.key === option.shortcut) { // Verwende event.key
+            const dropdownId = `#${id}-select`;
+            d3.select(dropdownId).property('value', option.value); // Setze den Wert basierend auf dem Shortcut
+            console.log(`Setting dropdown value to: ${option.value}`); // Log für Debugging
+            
+            // Optional: Führe eine Funktion aus, die auf die Auswahl reagiert
+            // updateBasedOnSelection(option.value);
+        }
+    });
+});
+
 
 function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
     let div = d3
@@ -76,6 +110,8 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
         .attr("class", cfgDetails.detailClass + " even-width")
         .attr("id", id);
     div.append("h3").text(title).attr("class", "center");
+
+    
     // Füge ein Eingabefeld hinzu, um die Zeit anzuzeigen
     div.append("input")
         .attr("type", "text")
@@ -144,9 +180,23 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
     }
 }
 
+
+const shortcutToDropdown = new Map();
+
+document.addEventListener("keydown", (event) => {
+    for (const [shortcut, { selectId, value }] of shortcutToDropdown.entries()) {
+        if (event.key === shortcut) {
+            d3.select(`#${selectId}`).property("value", value).dispatch("change");
+        }
+    }
+});
+
+
 export {
     createRadioButtons,
     createTextField,
     createDropdown,
     createTimeWidget,
+    shortcutToDropdown,
 };
+

@@ -31,8 +31,8 @@ function createDropdownPage(id, data) {
                   id: "sample-dropdown",
                   title: "Detail Name",
                   options: [
-                      { value: "Option 1", selected: true },
-                      { value: "Option 2" },
+                      { value: "Option 1 (Ctrl+1)", selected: true },
+                      { value: "Option 2 (Ctrl+2)" },
                   ],
               }
     );
@@ -74,21 +74,34 @@ function createDropdownPage(id, data) {
         .append("label")
         .attr("for", "dropdown-field-default-text")
         .attr("class", "form-label")
-        .text("Options");
-    optionsDiv
+        .text("Options (and Shortcuts)");
+    
+    let optionsTextarea = optionsDiv
         .append("textarea")
         .attr("class", "form-control textarea")
         .attr("id", "dropdown-options")
-        .attr("rows", "10")
-        .text(
-            data
-                ? data.options.map((x) => x.value).join("\n")
-                : "Option 1\nOption 2\n"
-        );
+        .attr("rows", "10");
+    
+    if (data && Array.isArray(data.options)) {
+        const validLines = data.options
+            .filter(x => x.value && x.value.trim() !== "") // nur sinnvolle Optionen
+            .map(x => {
+                const value = x.value.trim();
+                const shortcut = x.shortcut !== undefined ? x.shortcut.trim() : '';
+                return `${value} ; ${shortcut}`;
+            });
+    
+        optionsTextarea.text(validLines.join("\n"));
+    } else {
+        optionsTextarea.text("Option 1 ; 1\nOption 2 ; 2\n");
+    }
+    
+    // Tooltip für die Optionen
     optionsDiv
         .append("div")
         .attr("class", "invalid-tooltip")
-        .text("Each option must be 1-50 characters long.");
+        .text("Each option must be 1-50 characters long, and can include a shortcut in parentheses. If you don't want to use a shortcut, just leave the parentheses empty.");
+
 
     // footer
     let footer = d3.select(id).append("div").attr("class", "footer-row");
@@ -137,7 +150,20 @@ function createNewDropdown(data) {
     }
 
     const text = d3.select("#dropdown-options").property("value");
-    let optionValues = text.split("\n");
+    let optionValues = text
+    .split("\n")
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && line.includes(";")) // nur sinnvolle Zeilen!
+    .map(line => {
+        const parts = line.split(';');
+        return {
+            value: parts[0].trim(),
+            shortcut: parts[1] ? parts[1].trim() : ''
+        };
+    });
+
+
+
 
     // drop empty value if it is last
     const last = optionValues.pop();
@@ -155,17 +181,16 @@ function createNewDropdown(data) {
         return;
     }
 
-    let options = optionValues.map((value) => ({
-        value: value,
-    }));
-    options[0] = { ...options[0], selected: true };
+    if (optionValues.length > 0) {
+        optionValues[0] = { ...optionValues[0], selected: true };
+    }
 
     let details = getDetails();
     const newDetail = {
         type: "dropdown",
         title: title,
         id: createId(title),
-        options: options,
+        options: optionValues,
         editable: true,
     };
     if (data) {

@@ -107,7 +107,15 @@
         </div>
         <hr />
 
+        <div class="main">
+          <div id="details" class="shot-info"></div>
+          <div class="center">
+              <div>
+                  <div id="toggles"></div>
+                  <div id="playing-area">
+
             <!-- Video-Upload -->
+        <!-- Video-Upload -->
         <input type="file" id="videoUpload" accept="video/*" />
         <video id="gameVideo" width="640" height="360" controls style="display:none;">
             <source id="videoSource" type="video/quicktime">
@@ -115,7 +123,7 @@
         </video>
 
         <!-- Container für das 3D-Spielfeld -->
-        <div id="3d-container" style="width: 100%; height: 500px;"></div>
+        <div id="3d-container" style="width: 100%; height: 100%;"></div>
 
         <script type="module" src="js/setup.js"></script>
         <script type="module" src="js/script.js"></script>
@@ -134,16 +142,28 @@
                     gameVideo.load(); // Video neu laden
                 }
             });
+
+            // Tastatursteuerung für das Video
+            document.addEventListener('keydown', function(event) {
+                // Überprüfe, ob die Leertaste gedrückt wurde
+                if (event.code === 'Space') {
+                    event.preventDefault(); // Verhindert das Scrollen der Seite
+                    if (gameVideo.paused) {
+                        gameVideo.play(); // Video abspielen
+                    } else {
+                        gameVideo.pause(); // Video pausieren
+                    }
+                }
+
+                // Überprüfe, ob die Pfeiltasten gedrückt wurden
+                if (event.code === 'ArrowRight') {
+                    gameVideo.currentTime += 5; // 5 Sekunden vorwärts spulen
+                } else if (event.code === 'ArrowLeft') {
+                    gameVideo.currentTime -= 5; // 5 Sekunden zurückspulen
+                }
+            });
         </script>
 
-        <input type="text" id="videoTime" value="0" readonly />
-
-        <div class="main">
-            <div id="details" class="shot-info"></div>
-            <div class="center">
-                <div>
-                    <div id="toggles"></div>
-                    <div id="playing-area">
                         <!-- inject:playingarea -->
                         <svg id="soccer-ncaa-svg" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox=" -1 -1 122 77">
   <g id="transformations">
