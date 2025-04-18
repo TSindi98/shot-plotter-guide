@@ -1,0 +1,30 @@
+services:
+  shot-plotter:
+    build:
+      context: ./Positionstracking
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+    volumes:
+      - ./Positionstracking:/app
+    restart: unless-stopped
+    container_name: shot-plotter
+
+  data-merging:
+    build:
+      context: ./Datenmerging
+    ports:
+      - "8502:8501"
+    networks:
+      - app-network
+    volumes:
+      - ./Datenmerging:/app
+    restart: unless-stopped
+    container_name: data-merging
+    depends_on:
+      - shot-plotter
+
+networks:
+  app-network:
+    driver: bridge 
