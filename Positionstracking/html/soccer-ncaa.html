@@ -155,54 +155,232 @@
                   <div id="playing-area">
 
             <!-- Video-Upload -->
-        <!-- Video-Upload -->
-        <input type="file" id="videoUpload" accept="video/*" />
-        <video id="gameVideo" width="640" height="360" controls style="display:none;">
-            <source id="videoSource" type="video/quicktime">
-            Ihr Browser unterstützt das Video-Tag nicht.
-        </video>
+            <input type="file" id="videoUpload" accept="video/*" />
+            <button id="openVideoInNewWindow" class="btn btn-primary" style="display:none; margin-left: 10px;">Video in neuem Fenster öffnen</button>
+            <video id="gameVideo" width="640" height="360" controls style="display:none;">
+                <source id="videoSource" type="video/quicktime">
+                Ihr Browser unterstützt das Video-Tag nicht.
+            </video>
 
-        <!-- Container für das 3D-Spielfeld -->
-        <div id="3d-container" style="width: 100%; height: 100%;"></div>
+            <!-- Container für das 3D-Spielfeld -->
+            <div id="3d-container" style="width: 100%; height: 100%;"></div>
 
-        <script type="module" src="../js/setup.js"></script>
-        <script type="module" src="../js/script.js"></script>
+            <script type="module" src="../js/setup.js"></script>
+            <script type="module" src="../js/script.js"></script>
 
-        <script>
-            const videoUpload = document.getElementById('videoUpload');
-            const gameVideo = document.getElementById('gameVideo');
-            const videoSource = document.getElementById('videoSource');
+            <script>
+                const videoUpload = document.getElementById('videoUpload');
+                const gameVideo = document.getElementById('gameVideo');
+                const videoSource = document.getElementById('videoSource');
+                const openVideoButton = document.getElementById('openVideoInNewWindow');
+                let videoUrl = '';
+                let newWindow = null;
 
-            videoUpload.addEventListener('change', function() {
-                const file = this.files[0];
-                if (file) {
-                    const url = URL.createObjectURL(file);
-                    videoSource.src = url;
-                    gameVideo.style.display = 'block'; // Video-Player anzeigen
-                    gameVideo.load(); // Video neu laden
-                }
-            });
-
-            // Tastatursteuerung für das Video
-            document.addEventListener('keydown', function(event) {
-                // Überprüfe, ob die Leertaste gedrückt wurde
-                if (event.code === 'Space') {
-                    event.preventDefault(); // Verhindert das Scrollen der Seite
-                    if (gameVideo.paused) {
-                        gameVideo.play(); // Video abspielen
-                    } else {
-                        gameVideo.pause(); // Video pausieren
+                videoUpload.addEventListener('change', function() {
+                    const file = this.files[0];
+                    if (file) {
+                        videoUrl = URL.createObjectURL(file);
+                        videoSource.src = videoUrl;
+                        gameVideo.style.display = 'block'; // Video-Player anzeigen
+                        openVideoButton.style.display = 'inline-block'; // Button anzeigen
+                        gameVideo.load(); // Video neu laden
                     }
-                }
+                });
 
-                // Überprüfe, ob die Pfeiltasten gedrückt wurden
-                if (event.code === 'ArrowRight') {
-                    gameVideo.currentTime += 3; // 3 Sekunden vorwärts spulen
-                } else if (event.code === 'ArrowLeft') {
-                    gameVideo.currentTime -= 3; // 3 Sekunden zurückspulen
-                }
-            });
-        </script>
+                openVideoButton.addEventListener('click', function() {
+                    if (videoUrl) {
+                        // Schließe vorheriges Fenster, falls es existiert
+                        if (newWindow && !newWindow.closed) {
+                            newWindow.close();
+                        }
+                        
+                        // Öffne ein neues Fenster
+                        newWindow = window.open('', 'VideoPlayer', 'width=800,height=600');
+                        
+                        // Schreibe den HTML-Inhalt
+                        newWindow.document.write('<!DOCTYPE html>');
+                        newWindow.document.write('<html>');
+                        newWindow.document.write('<head>');
+                        newWindow.document.write('<title>Video Player</title>');
+                        newWindow.document.write('<style>');
+                        newWindow.document.write('body { margin: 0; overflow: hidden; background-color: #000; }');
+                        newWindow.document.write('video { width: 100%; height: 100vh; }');
+                        newWindow.document.write('</style>');
+                        newWindow.document.write('</head>');
+                        newWindow.document.write('<body>');
+                        newWindow.document.write('<video id="externalVideo" controls autoplay>');
+                        newWindow.document.write('<source src="' + videoUrl + '" type="video/mp4">');
+                        newWindow.document.write('Ihr Browser unterstützt das Video-Tag nicht.');
+                        newWindow.document.write('</video>');
+                        newWindow.document.write('<script>');
+                        newWindow.document.write('const video = document.getElementById("externalVideo");');
+                        newWindow.document.write('document.addEventListener("keydown", function(event) {');
+                        newWindow.document.write('if (event.code === "Space") {');
+                        newWindow.document.write('event.preventDefault();');
+                        newWindow.document.write('if (video.paused) { video.play(); } else { video.pause(); }');
+                        newWindow.document.write('}');
+                        newWindow.document.write('if (event.code === "ArrowRight") {');
+                        newWindow.document.write('video.currentTime += 3;');
+                        newWindow.document.write('} else if (event.code === "ArrowLeft") {');
+                        newWindow.document.write('video.currentTime -= 3;');
+                        newWindow.document.write('}');
+                        newWindow.document.write('});');
+                        newWindow.document.write('window.addEventListener("message", function(event) {');
+                        newWindow.document.write('if (event.data.action === "sync") {');
+                        newWindow.document.write('video.currentTime = event.data.time;');
+                        newWindow.document.write('if (event.data.play) { video.play(); } else { video.pause(); }');
+                        newWindow.document.write('}');
+                        newWindow.document.write('});');
+                        newWindow.document.write('');
+                        newWindow.document.write('// Sende Änderungen zurück zum Hauptfenster');
+                        newWindow.document.write('let lastUpdateTime = 0;');
+                        newWindow.document.write('let lastSentTime = 0;');
+                        newWindow.document.write('');
+                        newWindow.document.write('// Eine Hilfsfunktion, die Änderungen zum Hauptfenster sendet');
+                        newWindow.document.write('function sendUpdateToMainWindow() {');
+                        newWindow.document.write('  const currentTime = video.currentTime;');
+                        newWindow.document.write('  // Sende nur, wenn sich die Zeit um mindestens 0.5 Sekunden geändert hat oder es ein seeked-Event war');
+                        newWindow.document.write('  if (Math.abs(currentTime - lastSentTime) > 0.5) {');
+                        newWindow.document.write('    lastSentTime = currentTime;');
+                        newWindow.document.write('    window.opener.postMessage({');
+                        newWindow.document.write('      action: "syncBack",');
+                        newWindow.document.write('      time: currentTime,');
+                        newWindow.document.write('      play: !video.paused');
+                        newWindow.document.write('    }, "*");');
+                        newWindow.document.write('    console.log("Sende Update an Hauptfenster:", currentTime);');
+                        newWindow.document.write('  }');
+                        newWindow.document.write('}');
+                        newWindow.document.write('');
+                        newWindow.document.write('video.addEventListener("timeupdate", function() {');
+                        newWindow.document.write('  // Limitiere die Anzahl der Aktualisierungen auf max. einmal pro Sekunde');
+                        newWindow.document.write('  const now = Date.now();');
+                        newWindow.document.write('  if (now - lastUpdateTime > 1000) {');
+                        newWindow.document.write('    lastUpdateTime = now;');
+                        newWindow.document.write('    sendUpdateToMainWindow();');
+                        newWindow.document.write('  }');
+                        newWindow.document.write('});');
+                        newWindow.document.write('');
+                        newWindow.document.write('video.addEventListener("play", function() {');
+                        newWindow.document.write('  window.opener.postMessage({');
+                        newWindow.document.write('    action: "syncBack",');
+                        newWindow.document.write('    time: video.currentTime,');
+                        newWindow.document.write('    play: true');
+                        newWindow.document.write('  }, "*");');
+                        newWindow.document.write('  console.log("Play-Event an Hauptfenster gesendet");');
+                        newWindow.document.write('});');
+                        newWindow.document.write('');
+                        newWindow.document.write('video.addEventListener("pause", function() {');
+                        newWindow.document.write('  window.opener.postMessage({');
+                        newWindow.document.write('    action: "syncBack",');
+                        newWindow.document.write('    time: video.currentTime,');
+                        newWindow.document.write('    play: false');
+                        newWindow.document.write('  }, "*");');
+                        newWindow.document.write('  console.log("Pause-Event an Hauptfenster gesendet");');
+                        newWindow.document.write('});');
+                        newWindow.document.write('');
+                        newWindow.document.write('video.addEventListener("seeked", function() {');
+                        newWindow.document.write('  lastSentTime = video.currentTime; // Aktualisiere lastSentTime');
+                        newWindow.document.write('  window.opener.postMessage({');
+                        newWindow.document.write('    action: "syncBack",');
+                        newWindow.document.write('    time: video.currentTime,');
+                        newWindow.document.write('    play: !video.paused');
+                        newWindow.document.write('  }, "*");');
+                        newWindow.document.write('  console.log("Seeked-Event an Hauptfenster gesendet:", video.currentTime);');
+                        newWindow.document.write('});');
+                        newWindow.document.write('<\/script>');
+                        newWindow.document.write('</body>');
+                        newWindow.document.write('</html>');
+                        newWindow.document.close();
+                        
+                        // Sync the two videos when playing/pausing in the main window
+                        gameVideo.addEventListener('play', function() {
+                            if (newWindow && !newWindow.closed) {
+                                newWindow.postMessage({
+                                    action: 'sync',
+                                    time: gameVideo.currentTime,
+                                    play: true
+                                }, '*');
+                            }
+                        });
+                        
+                        gameVideo.addEventListener('pause', function() {
+                            if (newWindow && !newWindow.closed) {
+                                newWindow.postMessage({
+                                    action: 'sync',
+                                    time: gameVideo.currentTime,
+                                    play: false
+                                }, '*');
+                            }
+                        });
+                        
+                        gameVideo.addEventListener('seeked', function() {
+                            if (newWindow && !newWindow.closed) {
+                                newWindow.postMessage({
+                                    action: 'sync',
+                                    time: gameVideo.currentTime,
+                                    play: !gameVideo.paused
+                                }, '*');
+                            }
+                        });
+                    }
+                });
+
+                // Erhalte Nachrichten vom externen Fenster
+                window.addEventListener('message', function(event) {
+                    if (event.data.action === 'syncBack' && gameVideo) {
+                        console.log("Nachricht vom externen Fenster erhalten:", event.data);
+                        
+                        // Vermeide Endlosschleife durch Vergleich der Zeiten
+                        if (Math.abs(gameVideo.currentTime - event.data.time) > 0.5) {
+                            console.log("Setze Videozeit auf:", event.data.time);
+                            gameVideo.currentTime = event.data.time;
+                        }
+                        
+                        if (event.data.play && gameVideo.paused) {
+                            console.log("Starte Video im Hauptfenster");
+                            gameVideo.play().catch(e => console.error("Fehler beim Abspielen:", e));
+                        } else if (!event.data.play && !gameVideo.paused) {
+                            console.log("Pausiere Video im Hauptfenster");
+                            gameVideo.pause();
+                        }
+                    }
+                });
+
+                // Tastatursteuerung für das Video
+                document.addEventListener('keydown', function(event) {
+                    // Prüfe, ob das Video oder ein Videoregler im Fokus ist
+                    const activeElement = document.activeElement;
+                    const isVideoFocused = activeElement === gameVideo || 
+                                           activeElement.tagName === 'VIDEO' ||
+                                           (activeElement && activeElement.closest && 
+                                            activeElement.closest('video, .video-controls')) ||
+                                           document.querySelector('video:hover') !== null;
+                    
+                    // Überprüfe, ob die Leertaste gedrückt wurde
+                    if (event.code === 'Space') {
+                        event.preventDefault(); // Verhindert das Scrollen der Seite
+                        if (gameVideo.paused) {
+                            gameVideo.play(); // Video abspielen
+                        } else {
+                            gameVideo.pause(); // Video pausieren
+                        }
+                    }
+
+                    // Überprüfe, ob die Pfeiltasten gedrückt wurden
+                    if ((event.code === 'ArrowRight' || event.code === 'ArrowLeft') && isVideoFocused) {
+                        event.preventDefault(); // Verhindert das Scrollen der Seite
+                        
+                        if (event.code === 'ArrowRight') {
+                            gameVideo.currentTime += 3; // 3 Sekunden vorwärts spulen
+                        } else if (event.code === 'ArrowLeft') {
+                            gameVideo.currentTime -= 3; // 3 Sekunden zurückspulen
+                        }
+                    }
+                });
+                
+                // Stellen Sie sicher, dass das Video fokussierbar ist
+                gameVideo.setAttribute('tabindex', '0');
+            </script>
 
                         <!-- inject:playingarea -->
                         <svg id="soccer-ncaa-svg" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox=" -1 -1 122 77">
