@@ -4,7 +4,7 @@ const preprocess = require("gulp-preprocess");
 const rename = require("gulp-rename");
 const inject = require("gulp-inject");
 const del = require("del");
-const sports = require("../supported-sports.json").sports;
+const sports = require("../../supported-sports.json").sports;
 
 const indexBanner = false;
 const banner = false;

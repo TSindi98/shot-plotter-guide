@@ -24,7 +24,7 @@ Dieses Projekt besteht aus zwei Docker-Containern:
 
 3. Zugriff auf die Anwendungen:
    - Shot-Plotter: http://localhost:8080/html/soccer-ncaa.html?width=120&height=75
-   - Datenmerging: http://localhost:8501
+   - Datenmerging: http://localhost:8502
 
 ## Verwendung
 
@@ -32,7 +32,7 @@ Dieses Projekt besteht aus zwei Docker-Containern:
 Die Shot-Plotter-Anwendung ist unter http://localhost:8080/html/soccer-ncaa.html?width=120&height=75 erreichbar. Sie können durch einfaches Klicken auf das Spielfeld Ereignisse aufzeichnen.
 
 ### Datenmerging
-Die Datenmerging-Anwendung läuft auf http://localhost:8501 und ermöglicht die Integration von:
+Die Datenmerging-Anwendung läuft auf http://localhost:8502 und ermöglicht die Integration von:
 1. Shot-Plotter CSV-Daten
 2. Playermaker XML-Daten
 3. Playermaker Possession Excel-Daten
