@@ -2,6 +2,7 @@ services:
   shot-plotter:
     build:
       context: ./Positionstracking
+    image: sindi98/shot-plotter-shot-plotter:latest
     ports:
       - "8080:8080"
     networks:
@@ -14,6 +15,7 @@ services:
   data-merging:
     build:
       context: ./Datenmerging
+    image: sindi98/shot-plotter-data-merging:latest
     ports:
       - "8502:8501"
     networks:

@@ -7,6 +7,7 @@ import {
     addFilteredRow,
     setNumRows,
     getNumRows,
+    getFilteredRows,
 } from "../table/table-functions.js";
 import { updateTableFooter } from "../table/table.js";
 import { getTypeIndex } from "../details/details-functions.js";
@@ -36,6 +37,7 @@ function setUpShots() {
             .attr("class", className);
     }
     dataStorage.set("firstPoint", null);
+    dataStorage.set("firstPointTime", null);
 
     d3.select("#playing-area")
         .select(perimeterId)
@@ -47,6 +49,13 @@ function setUpShots() {
             if (shiftHeld && firstPoint === null) {
                 // create ghost dot for first point
                 dataStorage.set("firstPoint", d3.pointer(e));
+                
+                // Tom
+                // Erfasse die Zeit vom Time Widget beim ersten Klick
+                const timeWidget = d3.select("#time");
+                const timestamp = timeWidget.empty() ? null : timeWidget.select("input").property("value");
+                dataStorage.set("firstPointTime", timestamp);
+                
                 const type = d3.select("#shot-type").empty()
                     ? null
                     : d3
@@ -67,8 +76,10 @@ function setUpShots() {
                     ghostBool: true,
                 });
             } else if (shiftHeld && firstPoint !== null) {
+                const firstPointTime = dataStorage.get("firstPointTime");
                 dataStorage.set("firstPoint", null);
-                createShotFromEvent(e, firstPoint);
+                dataStorage.set("firstPointTime", null);
+                createShotFromEvent(e, firstPoint, firstPointTime);
             } else {
                 createShotFromEvent(e);
             }
@@ -80,8 +91,9 @@ function setUpShots() {
         });
     }
 }
+//Tom Ende
 
-function createShotFromEvent(e, point1) {
+function createShotFromEvent(e, point1, firstPointTime) {
     // https://stackoverflow.com/a/29325047
 
     const columns = getHeaderRow();
@@ -125,11 +137,19 @@ function createShotFromEvent(e, point1) {
                     .select("select")
                     .property("value");
                 break;
+
+            // Tom
             case "time":
-                // Hier den Zeitstempel des Videos erfassen
-                const timestamp = document.getElementById('gameVideo').currentTime; // Aktueller Zeitstempel des Videos
-                rowData[col.id] = timestamp; // Zeitstempel speichern
+                // Verwende die Zeit vom ersten Klick wenn im 2-Punkt-Modus, sonst die aktuelle Zeit vom Time Widget
+                if (point1 && firstPointTime !== null) {
+                    rowData[col.id] = firstPointTime;
+                } else {
+                    // Lese die Zeit direkt aus dem Time Widget
+                    const timeWidget = d3.select("#time");
+                    rowData[col.id] = timeWidget.empty() ? null : timeWidget.select("input").property("value");
+                }
                 break;
+            // Tom Ende 
             case "team":
                 specialData["teamColor"] = d3
                     .select("input[name='team-bool']:checked")
@@ -152,17 +172,25 @@ function createShotFromEvent(e, point1) {
                     (col.id == "xadj" || col.id == "x2adj")
                         ? -1
                         : 1;
+                // Tom 
+                // Prüfen, ob die Koordinaten gespiegelt werden sollen
+                let mirrorXFactor = 
+                    !d3.select("#mirror-coords-toggle").empty() &&
+                    d3.select("#mirror-coords-toggle").property("checked")
+                        ? -1
+                        : 1;
+                // Tom Ende
                 if (col.id === "x2" || col.id === "x2adj") {
                     let x2 = specialData["coords2"]
                         ? (
-                              adjXFactor *
+                              mirrorXFactor * adjXFactor *
                               (specialData["coords2"][0] - cfgSportA.width / 2)
                           ).toFixed(2)
                         : "";
                     rowData[col.id] = x2;
                 } else {
                     rowData[col.id] = (
-                        adjXFactor *
+                        mirrorXFactor * adjXFactor *
                         (specialData["coords"][0] - cfgSportA.width / 2)
                     ).toFixed(2);
                 }
@@ -174,11 +202,20 @@ function createShotFromEvent(e, point1) {
                     (col.id == "yadj" || col.id == "y2adj")
                         ? -1
                         : 1;
+                
+                // Tom
+                // Prüfen, ob die Koordinaten gespiegelt werden sollen
+                let mirrorYFactor = 
+                    !d3.select("#mirror-coords-toggle").empty() &&
+                    d3.select("#mirror-coords-toggle").property("checked")
+                        ? -1
+                        : 1;
+                // Tom Ende
                 if (col.id === "y2" || col.id === "y2adj") {
                     let y2 = specialData["coords2"]
                         ? (
                               -1 *
-                              adjYFactor *
+                              mirrorYFactor * adjYFactor *
                               (specialData["coords2"][1] - cfgSportA.height / 2)
                           ).toFixed(2)
                         : "";
@@ -186,7 +223,7 @@ function createShotFromEvent(e, point1) {
                 } else {
                     rowData[col.id] = (
                         -1 *
-                        adjYFactor *
+                        mirrorYFactor * adjYFactor *
                         (specialData["coords"][1] - cfgSportA.height / 2)
                     ).toFixed(2);
                 }
@@ -256,7 +293,7 @@ function createShotFromData(id, rowData, specialData, newRow = true) {
         heatMap();
     } else {
         createDot("#normal", id, specialData, "hidden");
-        if (addRow) {
+        if (newRow) {
             setNumRows(getNumRows() + 1);
             updateTableFooter();
         }

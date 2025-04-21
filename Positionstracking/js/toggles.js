@@ -6,6 +6,7 @@ export function allTogglesFunctionality() {
     twoPointFunctionality();
     heatMapFunctionality();
     adjCoordsFunctionality();
+    mirrorCoordsFunctionality();
 }
 
 export function setUpToggles() {
@@ -17,6 +18,10 @@ export function setUpToggles() {
     toggles
         .append("div")
         .attr("class", "toggle-area center")
+        .attr("id", "mirror-coords-toggle-area");
+    toggles
+        .append("div")
+        .attr("class", "toggle-area center")
         .attr("id", "two-point-toggle-area");
     toggles
         .append("div")
@@ -25,6 +30,48 @@ export function setUpToggles() {
 
     allTogglesFunctionality();
 }
+
+// Tom
+export function mirrorCoordsFunctionality() {
+    function setOn() {
+        d3.select("#mirror-coords-toggle").property("checked", true);
+    }
+    function setOff() {
+        d3.select("#mirror-coords-toggle").property("checked", false);
+    }
+    
+    d3.select("#mirror-coords-toggle-area").selectAll("*").remove();
+    const toggleArea = d3.select("#mirror-coords-toggle-area");
+    
+    toggleArea
+        .append("label")
+        .attr("class", "form-check-label")
+        .attr("for", "mirror-coords-toggle")
+        .text("Normale Koordinaten");
+    
+    let toggle = toggleArea
+        .append("div")
+        .attr("class", "form-check form-switch");
+    
+    toggle
+        .append("input")
+        .attr("class", "form-check-input")
+        .attr("type", "checkbox")
+        .attr("id", "mirror-coords-toggle")
+        .property("checked", false)
+        .on("change", () =>
+            d3.select("#mirror-coords-toggle").property("checked")
+                ? setOn()
+                : setOff()
+        );
+    
+    toggleArea
+        .append("label")
+        .attr("class", "form-check-label")
+        .attr("for", "mirror-coords-toggle")
+        .text("Gespiegelte Koordinaten");
+}
+// Tom Ende
 
 export function twoPointFunctionality() {
     function setOn() {
@@ -81,6 +128,7 @@ export function twoPointFunctionality() {
         d3.select("#two-point-toggle-area").selectAll("*").remove();
     }
 }
+
 
 export function adjCoordsFunctionality() {
     function setOn() {

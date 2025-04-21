@@ -183,27 +183,45 @@ function processCSV(uploadId, row, swapTeamColor) {
         }
     }
 
+    // Tom
     // add additional attributes to row
     let id = uuidv4();
-
+    
+    // Berücksichtige die Koordinatenspiegelung auch beim Import
+    let mirrorFactor = 
+        !d3.select("#mirror-coords-toggle").empty() &&
+        d3.select("#mirror-coords-toggle").property("checked")
+            ? -1
+            : 1;
+            
+    // Wende den Spiegelungsfaktor auf die X- und Y-Koordinaten an
+    const x = parseFloat(row.X) * mirrorFactor;
+    const y = parseFloat(row.Y) * mirrorFactor;
+    
     let specialData = {
         typeIndex: getTypeIndex(row.Type),
         teamColor: teamColor,
         coords: [
-            parseFloat(row.X) + cfgSportA.width / 2,
-            -1 * parseFloat(row.Y) + cfgSportA.height / 2,
+            x + cfgSportA.width / 2,
+            -1 * y + cfgSportA.height / 2,
         ], // undo coordinate adjustment
         player: row.Player,
         numberCol: _.findIndex(getHeaderRow(), { type: "shot-number" }) - 1,
     };
 
     if (row.X2 && row.Y2) {
+        const x2 = parseFloat(row.X2) * mirrorFactor;
+        const y2 = parseFloat(row.Y2) * mirrorFactor;
+        
         specialData.coords2 = [
-            parseFloat(row.X2) + cfgSportA.width / 2,
-            -1 * parseFloat(row.Y2) + cfgSportA.height / 2,
+            x2 + cfgSportA.width / 2,
+            -1 * y2 + cfgSportA.height / 2,
         ]; // undo coordinate adjustment
     }
 
+    // Tom Ende
+
+    
     let headerIds = _.without(
         _.compact(getHeaderRow().map((x) => x.id)),
         "shot-number"

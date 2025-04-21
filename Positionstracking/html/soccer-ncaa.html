@@ -93,6 +93,9 @@
             href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.0/font/bootstrap-icons.css"
         />
         <link rel="stylesheet" href="../index.css" />
+        
+        
+        <!-- Tom -->
 
                <!-- Custom styles for layout adjustment -->
         <style>
@@ -132,6 +135,8 @@
                     max-width: 100%;
                 }
             }
+
+            /* Tom Ende */
         </style>
     </head>
 
@@ -154,6 +159,8 @@
                   <div id="toggles"></div>
                   <div id="playing-area">
 
+            <!-- Tom -->
+            
             <!-- Video-Upload -->
             <input type="file" id="videoUpload" accept="video/*" />
             <button id="openVideoInNewWindow" class="btn btn-primary" style="display:none; margin-left: 10px;">Video in neuem Fenster öffnen</button>
@@ -236,10 +243,8 @@
                         newWindow.document.write('let lastUpdateTime = 0;');
                         newWindow.document.write('let lastSentTime = 0;');
                         newWindow.document.write('');
-                        newWindow.document.write('// Eine Hilfsfunktion, die Änderungen zum Hauptfenster sendet');
                         newWindow.document.write('function sendUpdateToMainWindow() {');
                         newWindow.document.write('  const currentTime = video.currentTime;');
-                        newWindow.document.write('  // Sende nur, wenn sich die Zeit um mindestens 0.5 Sekunden geändert hat oder es ein seeked-Event war');
                         newWindow.document.write('  if (Math.abs(currentTime - lastSentTime) > 0.5) {');
                         newWindow.document.write('    lastSentTime = currentTime;');
                         newWindow.document.write('    window.opener.postMessage({');
@@ -247,12 +252,10 @@
                         newWindow.document.write('      time: currentTime,');
                         newWindow.document.write('      play: !video.paused');
                         newWindow.document.write('    }, "*");');
-                        newWindow.document.write('    console.log("Sende Update an Hauptfenster:", currentTime);');
                         newWindow.document.write('  }');
                         newWindow.document.write('}');
                         newWindow.document.write('');
                         newWindow.document.write('video.addEventListener("timeupdate", function() {');
-                        newWindow.document.write('  // Limitiere die Anzahl der Aktualisierungen auf max. einmal pro Sekunde');
                         newWindow.document.write('  const now = Date.now();');
                         newWindow.document.write('  if (now - lastUpdateTime > 1000) {');
                         newWindow.document.write('    lastUpdateTime = now;');
@@ -266,7 +269,6 @@
                         newWindow.document.write('    time: video.currentTime,');
                         newWindow.document.write('    play: true');
                         newWindow.document.write('  }, "*");');
-                        newWindow.document.write('  console.log("Play-Event an Hauptfenster gesendet");');
                         newWindow.document.write('});');
                         newWindow.document.write('');
                         newWindow.document.write('video.addEventListener("pause", function() {');
@@ -275,17 +277,15 @@
                         newWindow.document.write('    time: video.currentTime,');
                         newWindow.document.write('    play: false');
                         newWindow.document.write('  }, "*");');
-                        newWindow.document.write('  console.log("Pause-Event an Hauptfenster gesendet");');
                         newWindow.document.write('});');
                         newWindow.document.write('');
                         newWindow.document.write('video.addEventListener("seeked", function() {');
-                        newWindow.document.write('  lastSentTime = video.currentTime; // Aktualisiere lastSentTime');
+                        newWindow.document.write('  lastSentTime = video.currentTime;');
                         newWindow.document.write('  window.opener.postMessage({');
                         newWindow.document.write('    action: "syncBack",');
                         newWindow.document.write('    time: video.currentTime,');
                         newWindow.document.write('    play: !video.paused');
                         newWindow.document.write('  }, "*");');
-                        newWindow.document.write('  console.log("Seeked-Event an Hauptfenster gesendet:", video.currentTime);');
                         newWindow.document.write('});');
                         newWindow.document.write('<\/script>');
                         newWindow.document.write('</body>');
@@ -348,14 +348,6 @@
 
                 // Tastatursteuerung für das Video
                 document.addEventListener('keydown', function(event) {
-                    // Prüfe, ob das Video oder ein Videoregler im Fokus ist
-                    const activeElement = document.activeElement;
-                    const isVideoFocused = activeElement === gameVideo || 
-                                           activeElement.tagName === 'VIDEO' ||
-                                           (activeElement && activeElement.closest && 
-                                            activeElement.closest('video, .video-controls')) ||
-                                           document.querySelector('video:hover') !== null;
-                    
                     // Überprüfe, ob die Leertaste gedrückt wurde
                     if (event.code === 'Space') {
                         event.preventDefault(); // Verhindert das Scrollen der Seite
@@ -367,7 +359,7 @@
                     }
 
                     // Überprüfe, ob die Pfeiltasten gedrückt wurden
-                    if ((event.code === 'ArrowRight' || event.code === 'ArrowLeft') && isVideoFocused) {
+                    if ((event.code === 'ArrowRight' || event.code === 'ArrowLeft')) {
                         event.preventDefault(); // Verhindert das Scrollen der Seite
                         
                         if (event.code === 'ArrowRight') {
@@ -377,9 +369,7 @@
                         }
                     }
                 });
-                
-                // Stellen Sie sicher, dass das Video fokussierbar ist
-                gameVideo.setAttribute('tabindex', '0');
+                /* Tom Ende */
             </script>
 
                         <!-- inject:playingarea -->

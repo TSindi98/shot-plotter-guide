@@ -294,7 +294,8 @@ input[type="text"] {
 }
 
 /* Location Toggle Styling */
-#two-point-toggle-area {
+#two-point-toggle-area,
+#mirror-coords-toggle-area {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -305,13 +306,15 @@ input[type="text"] {
   margin: 0 auto;
 }
 
-#two-point-toggle-area label {
+#two-point-toggle-area label,
+#mirror-coords-toggle-area label {
   margin: 0 0.5rem;
   font-weight: 500;
   font-size: 0.9rem;
 }
 
-#two-point-toggle-area .form-check-input {
+#two-point-toggle-area .form-check-input,
+#mirror-coords-toggle-area .form-check-input {
   margin: 0 0.5rem;
   cursor: pointer;
 }

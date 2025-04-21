@@ -96,8 +96,6 @@ document.addEventListener('keydown', function(event) {
             d3.select(dropdownId).property('value', option.value); // Setze den Wert basierend auf dem Shortcut
             console.log(`Setting dropdown value to: ${option.value}`); // Log für Debugging
             
-            // Optional: Führe eine Funktion aus, die auf die Auswahl reagiert
-            // updateBasedOnSelection(option.value);
         }
     });
 });
@@ -111,12 +109,18 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
         .attr("id", id);
     div.append("h3").text(title).attr("class", "center");
 
+    // Standardwert für defaultTime mit Hundertstel
+    if (defaultTime && !defaultTime.includes('.')) {
+        defaultTime = defaultTime + '.00';
+    } else if (!defaultTime) {
+        defaultTime = '00:00.00';
+    }
     
     // Füge ein Eingabefeld hinzu, um die Zeit anzuzeigen
     div.append("input")
         .attr("type", "text")
         .attr("readonly", true) // Nur Lesezugriff
-        .attr("value", "00:00"); // Standardwert
+        .attr("value", "00:00.00"); // Standardwert mit Hundertstel
 
     const videoElement = document.getElementById('gameVideo'); // Das Video-Element
 
@@ -127,58 +131,15 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
         d3.select("#" + id).select("input").property("value", formattedTime); // Aktualisiere das Widget
     });
 
-    // Hilfsfunktion zum Formatieren der Zeit
+    // Hilfsfunktion zum Formatieren der Zeit mit Hundertstel
     function formatTime(seconds) {
         const minutes = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        return `${minutes}:${secs < 10 ? '0' : ''}${secs}`; // Format: mm:ss
-
-    let text = div.append("div").attr("class", "time-widget position-relative");
-    text.append("input")
-        .attr("type", "text")
-        .attr("class", "form-control time-box")
-        .attr("value", defaultTime);
-    text.append("div")
-        .attr("class", "invalid-tooltip")
-        .text("Times must be in the form 'MM:SS' or 'M:SS'.");
-    text.append("div")
-        .attr("class", "white-btn time-btn")
-        .on("click", function () {
-            if (
-                d3.select(this).select("i").attr("class") === "bi bi-stop-fill"
-            ) {
-                timer.stop();
-                d3.select(this).select("i").remove();
-                d3.select(this).append("i").attr("class", "bi bi-play-fill");
-                d3.select("#" + id)
-                    .select("input")
-                    .attr("disabled", null);
-            } else {
-                let time = d3
-                    .select("#" + id)
-                    .select("input")
-                    .property("value");
-                if (/^\d{1,2}:\d\d$/.test(time)) {
-                    d3.select("#" + id)
-                        .select("input")
-                        .attr("disabled", true)
-                        .attr("class", "form-control time-box");
-                    d3.select(this).select("i").remove();
-                    d3.select(this)
-                        .append("i")
-                        .attr("class", "bi bi-stop-fill");
-                    timer.start(time);
-                } else {
-                    d3.select("#" + id)
-                        .select("input")
-                        .attr("class", "form-control time-box is-invalid");
-                }
-            }
-        })
-        .append("i")
-        .attr("class", "bi bi-play-fill");
+        const hundredths = Math.floor((seconds % 1) * 100);
+        return `${minutes}:${secs < 10 ? '0' : ''}${secs}.${hundredths < 10 ? '0' : ''}${hundredths}`; // Format: mm:ss.hh
     }
 }
+
 
 
 const shortcutToDropdown = new Map();
