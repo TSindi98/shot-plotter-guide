@@ -180,7 +180,12 @@
                 <input type="number" id="field-height" name="field-height" min="60" max="80" value="68">
                 <span>(60-80 meters)</span>
             </div>
-            <button id="apply-size" class="btn btn-primary">Apply Size</button>
+            <div>
+                <label for="skip-time">Skip Time:</label>
+                <input type="number" id="skip-time" name="skip-time" min="1" max="30" value="3">
+                <span>(1-30 seconds)</span>
+            </div>
+            <button id="apply-size" class="btn btn-primary">Apply Settings</button>
         </div>
         
         <hr />
@@ -327,9 +332,15 @@
             document.getElementById('apply-size').addEventListener('click', function() {
                 const width = document.getElementById('field-width').value;
                 const height = document.getElementById('field-height').value;
+                const skipTime = document.getElementById('skip-time').value;
                 
                 if (width < 90 || width > 120 || height < 60 || height > 80) {
                     alert('Bitte halte dich an die erlaubten Größenbereiche: Breite 90-120 Meter, Höhe 60-80 Meter');
+                    return;
+                }
+                
+                if (skipTime < 1 || skipTime > 30) {
+                    alert('Bitte wähle eine Vorspulzeit zwischen 1 und 30 Sekunden');
                     return;
                 }
                 
@@ -337,6 +348,7 @@
                 const params = new URLSearchParams(window.location.search);
                 params.set('width', width);
                 params.set('height', height);
+                params.set('skipTime', skipTime);
                 window.location.href = `${window.location.pathname}?${params.toString()}`;
             });
             
@@ -345,9 +357,11 @@
                 const params = new URLSearchParams(window.location.search);
                 const width = params.get('width');
                 const height = params.get('height');
+                const skipTime = params.get('skipTime');
                 
                 if (width) document.getElementById('field-width').value = width;
                 if (height) document.getElementById('field-height').value = height;
+                if (skipTime) document.getElementById('skip-time').value = skipTime;
             });
         </script>
 
@@ -538,11 +552,12 @@
                 // Überprüfe, ob die Pfeiltasten gedrückt wurden
                 if ((event.code === 'ArrowRight' || event.code === 'ArrowLeft')) {
                     event.preventDefault(); // Verhindert das Scrollen der Seite
+                    const skipTime = parseInt(document.getElementById('skip-time').value) || 3;
                     
                     if (event.code === 'ArrowRight') {
-                        gameVideo.currentTime += 3; // 3 Sekunden vorwärts spulen
+                        gameVideo.currentTime += skipTime; // Konfigurierbare Sekunden vorwärts spulen
                     } else if (event.code === 'ArrowLeft') {
-                        gameVideo.currentTime -= 3; // 3 Sekunden zurückspulen
+                        gameVideo.currentTime -= skipTime; // Konfigurierbare Sekunden zurückspulen
                     }
                 }
             });
