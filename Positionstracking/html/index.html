@@ -554,11 +554,28 @@
                     event.preventDefault(); // Verhindert das Scrollen der Seite
                     const skipTime = parseInt(document.getElementById('skip-time').value) || 3;
                     
-                    if (event.code === 'ArrowRight') {
-                        gameVideo.currentTime += skipTime; // Konfigurierbare Sekunden vorwärts spulen
-                    } else if (event.code === 'ArrowLeft') {
-                        gameVideo.currentTime -= skipTime; // Konfigurierbare Sekunden zurückspulen
+                    if (event.metaKey || event.ctrlKey) { // Cmd (Mac) oder Ctrl (Windows) gedrückt
+                        // Doppelte Geschwindigkeit beim Halten der Taste
+                        if (event.code === 'ArrowRight') {
+                            gameVideo.playbackRate = 2.0;
+                        } else if (event.code === 'ArrowLeft') {
+                            gameVideo.playbackRate = -2.0;
+                        }
+                    } else {
+                        // Normale Zeitsprünge bei einzelnen Tastendrücken
+                        if (event.code === 'ArrowRight') {
+                            gameVideo.currentTime += skipTime;
+                        } else if (event.code === 'ArrowLeft') {
+                            gameVideo.currentTime -= skipTime;
+                        }
                     }
+                }
+            });
+
+            // Setze die Wiedergabegeschwindigkeit zurück, wenn die Taste losgelassen wird
+            document.addEventListener('keyup', function(event) {
+                if (event.code === 'ArrowRight' || event.code === 'ArrowLeft' || event.key === 'Meta' || event.key === 'Control') {
+                    gameVideo.playbackRate = 1.0;
                 }
             });
     </script>
