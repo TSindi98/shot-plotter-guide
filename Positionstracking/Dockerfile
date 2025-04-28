@@ -11,5 +11,5 @@ RUN npm install -g http-server
 # Exponiere Port 8080
 EXPOSE 8080
 
-# Starte den http-server
-CMD ["http-server", "-p", "8080", "--cors"]
+# Starte den http-server im Hauptverzeichnis statt in html/
+CMD ["http-server", ".", "-p", "8080", "--cors"]

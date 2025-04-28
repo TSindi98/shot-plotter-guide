@@ -20,7 +20,7 @@ export function customPlayingAreaSetup() {
 
 function customSoccerPlayingAreaSetup() {
     const minMax = minMaxes[sport];
-    const inYards = sport === "soccer-ncaa" || sport === "soccer-ifab-yd";
+    const inMeters = sport === "soccer-ncaa" || sport === "soccer-ifab-m";
 
     let w = cfgSportA.width;
     let h = cfgSportA.height;
@@ -88,11 +88,12 @@ function customSoccerPlayingAreaSetup() {
         }
     }
 
-    const goal = inYards ? 8 : 7.32;
+    // Standardwerte für ein Fußballfeld in Metern
+    const goal = 7.32; // Standardbreite des Tores in Metern
     const halfgoal = goal / 2;
-    const eighteenyd = inYards ? 18 : 16.5;
-    const goalarea = inYards ? 6 : 5.5;
-    const arc = inYards ? 8 : 7.312;
+    const eighteenyd = 16.5; // 18-Yard-Box in Metern (entspricht etwa 16,5m)
+    const goalarea = 5.5; // Torraum in Metern (entspricht etwa 5,5m)
+    const arc = 9.15; // Radius des Strafraum-Bogens in Metern
 
     setCfgSportGoalCoords([
         [0, halfh],
@@ -136,12 +137,12 @@ function customSoccerPlayingAreaSetup() {
 
         ga.select(`#${dir}-penalty-kick-mark`)
             .attr("cy", halfh)
-            .attr("d", `M 12 ${halfh - 0.33} L 12 ${halfh + 0.33}`);
+            .attr("d", `M 11 ${halfh - 0.33} L 11 ${halfh + 0.33}`);
 
         ga.select(`#${dir}-goal-arc`).attr(
             "d",
             `M ${eighteenyd} ${halfh - arc}
-             A 10 10 1 0 1 ${eighteenyd} ${halfh + arc}
+             A 9.15 9.15 1 0 1 ${eighteenyd} ${halfh + arc}
             `
         );
 

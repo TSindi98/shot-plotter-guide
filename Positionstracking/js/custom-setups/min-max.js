@@ -12,10 +12,10 @@ export const minMaxes = {
         maxHeight: 90,
     },
     "soccer-ncaa": {
-        minWidth: 115,
+        minWidth: 90,
         maxWidth: 120,
-        minHeight: 70,
-        maxHeight: 75,
+        minHeight: 60,
+        maxHeight: 80,
     },
     "indoor-lacrosse": {
         minWidth: 180,

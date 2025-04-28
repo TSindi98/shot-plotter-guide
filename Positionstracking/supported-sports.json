@@ -1559,7 +1559,7 @@
         {
             "id": "football-ncaa",
             "name": "Football (NCAA)",
-            "units": "yards",
+            "units": "meters",
             "specifications": "National Collegiate Athletic Association (2021)",
             "dimensions": "120 x 53.33",
             "scoringArea": null,
@@ -1628,7 +1628,7 @@
         {
             "id": "cfl",
             "name": "Canadian Football",
-            "units": "yards",
+            "units": "meters",
             "specifications": "Canadian Football League (2022)",
             "dimensions": "110 x 65 (150 x 65 including goal areas)",
             "scoringArea": null,
@@ -1697,7 +1697,7 @@
         {
             "id": "cfl-pre-2022",
             "name": "Canadian Football (CFL pre-2022 & Amateur)",
-            "units": "yards",
+            "units": "meters",
             "specifications": "Canadian Football League (2021)",
             "dimensions": "110 x 65 (150 x 65 including goal areas)",
             "scoringArea": null,
@@ -1766,15 +1766,15 @@
         {
             "id": "soccer-ncaa",
             "name": "Soccer (NCAA)",
-            "units": "yards",
+            "units": "meters",
             "specifications": "National Collegiate Athletic Association (2022 & 2023)",
             "needsCustomSetup": true,
-            "dimensions": "120 x 75",
+            "dimensions": "105 x 68",
             "scoringArea": "goal",
             "perimeter": "#transformations",
             "appearance": {
-                "width": "120",
-                "height": "75",
+                "width": "105",
+                "height": "68",
                 "circleR": "1.2",
                 "polyR": "1.65",
                 "fontSize": "0.09rem",
@@ -1784,8 +1784,8 @@
                 "heatMapHighOpacity": 0.4
             },
             "goalCoords": [
-                [0, 37.5],
-                [120, 37.5]
+                [0, 34],
+                [105, 34]
             ],
             "defaultDetails": [
                 {
@@ -2330,7 +2330,7 @@
             "id": "soccer-meerse",
             "name": "Soccer (requested by John Meerse)",
             "private": true,
-            "units": "yards",
+            "units": "meters",
             "specifications": "National Federation of State High School Associations (2023)",
             "dimensions": "115 x 70",
             "scoringArea": "goal",
