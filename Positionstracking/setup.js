@@ -21,7 +21,7 @@ export let cfgDefaultEnable;
 export let perimeterId;
 
 export function indexSetup() {
-    d3.json("/supported-sports.json").then((data) => {
+    d3.json("./supported-sports.json").then((data) => {
         const customSports = _.filter(data.sports, "needsCustomSetup");
         for (const s of customSports) {
             customCardSetup(s);
@@ -36,7 +36,7 @@ export function setCfgSportGoalCoords(newGoalCoords) {
 export function setup(s) {
     sport = s;
     dataStorage = localDataStorage(sport);
-    d3.json("/supported-sports.json").then((data) => {
+    d3.json("./supported-sports.json").then((data) => {
         let sportData = _.find(data.sports, { id: sport });
         cfgSportCustomSetup = false;
         if (sportData.needsCustomSetup) {

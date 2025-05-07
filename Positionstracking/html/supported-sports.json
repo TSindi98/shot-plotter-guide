@@ -1800,25 +1800,15 @@
                     "id": "half",
                     "options": [
                         { "value": "1", "checked": true },
-                        { "value": "2" },
-                        { "value": "OT1" },
-                        { "value": "OT3" }
+                        { "value": "2" }
                     ]
                 },
                 {
-                    "type": "team",
-                    "title": "Team",
-                    "className": "team-select",
-                    "id": "team",
-                    "blueTeamName": "Home",
-                    "orangeTeamName": "Away",
-                    "checked": "blue-team-select"
-                },
-                {
-                    "type": "player",
-                    "title": "Player",
-                    "id": "player-input",
-                    "defaultValue": ""
+                    "type": "time",
+                    "title": "Time",
+                    "id": "time",
+                    "format": "mm:ss",
+                    "defaultValue": "00:00"
                 },
                 {
                     "type": "shot-type",
@@ -1944,6 +1934,13 @@
                     ]
                 },
                 {
+                    "type": "time",
+                    "title": "Time",
+                    "id": "time",
+                    "format": "mm:ss",
+                    "defaultValue": "00:00"
+                },
+                {
                     "type": "team",
                     "title": "Team",
                     "className": "team-select",
@@ -2014,6 +2011,13 @@
                         { "value": "OT1" },
                         { "value": "OT2" }
                     ]
+                },
+                {
+                    "type": "time",
+                    "title": "Time",
+                    "id": "time",
+                    "format": "mm:ss",
+                    "defaultValue": "00:00"
                 },
                 {
                     "type": "team",
@@ -2367,6 +2371,13 @@
                         { "value": "OT1" },
                         { "value": "OT2" }
                     ]
+                },
+                {
+                    "type": "time",
+                    "title": "Time",
+                    "id": "time",
+                    "format": "mm:ss",
+                    "defaultValue": "00:00"
                 },
                 {
                     "type": "team",

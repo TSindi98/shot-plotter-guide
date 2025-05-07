@@ -2,11 +2,14 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Kopiere alle Dateien aus dem aktuellen Verzeichnis
-COPY . .
+# Kopiere requirements.txt zuerst für besseres Caching
+COPY requirements.txt .
 
-# Installiere Abhängigkeiten
-RUN pip install --no-cache-dir streamlit pandas numpy plotly
+# Installiere Abhängigkeiten aus requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Kopiere den Rest der Dateien
+COPY . .
 
 # Exponiere Port 8501 (interner Port für Streamlit)
 EXPOSE 8501

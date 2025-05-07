@@ -6,7 +6,7 @@ services:
         platforms:
           - linux/amd64
           - linux/arm64
-    image: sindi98/shot-plotter-shot-plotter:latest
+    image: sindi98/shot-plotter-shot-plotter:v1.1
     ports:
       - "8080:8080"
     networks:
@@ -23,7 +23,7 @@ services:
         platforms:
           - linux/amd64
           - linux/arm64
-    image: sindi98/shot-plotter-data-merging:latest
+    image: sindi98/shot-plotter-data-merging:v1.1
     ports:
       - "8502:8501"
     networks:
