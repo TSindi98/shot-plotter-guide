@@ -1822,7 +1822,18 @@
                     ]
                 },
                 { "type": "x", "title": "X", "id": "x", "noWidget": true },
-                { "type": "y", "title": "Y", "id": "y", "noWidget": true }
+                { "type": "y", "title": "Y", "id": "y", "noWidget": true },
+                {
+                    "type": "dropdown",
+                    "title": "Shot Type",
+                    "id": "shot-type-dropdown",
+                    "options": [
+                        { "value": "Shot", "shortcut": "1", "selected": true },
+                        { "value": "Goal", "shortcut": "2" },
+                        { "value": "Block", "shortcut": "3" },
+                        { "value": "Miss", "shortcut": "4" }
+                    ]
+                }
             ]
         },
         {
