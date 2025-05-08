@@ -49,6 +49,12 @@ export function setup(s) {
         perimeterId = sportData.perimeter;
         getDefaultSetup = function () {
             const details = _.cloneDeep(sportData.defaultDetails);
+            // Set isDefault for dropdowns from JSON
+            details.forEach(detail => {
+                if (detail.type === "dropdown") {
+                    detail.isDefault = true;
+                }
+            });
             return {
                 details: details,
                 ...cfgOtherSetup,

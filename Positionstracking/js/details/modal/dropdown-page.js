@@ -59,7 +59,19 @@ function createDropdownPage(id, data) {
         .attr("type", "text")
         .attr("class", "form-control")
         .attr("id", "dropdown-title")
-        .property("value", data ? data.title : "");
+        .property("value", data ? data.title : "")
+        .property("readonly", data && data.isDefault)
+        .property("disabled", data && data.isDefault)
+        .style("background-color", data && data.isDefault ? "#e9ecef" : "")
+        .style("pointer-events", data && data.isDefault ? "none" : "")
+        .style("user-select", data && data.isDefault ? "none" : "")
+        .style("opacity", data && data.isDefault ? "0.7" : "1")
+        .on("keydown", function(e) {
+            if (data && data.isDefault) {
+                e.preventDefault();
+                return false;
+            }
+        });
     nameDiv
         .append("div")
         .attr("class", "invalid-tooltip")
@@ -151,47 +163,42 @@ function createNewDropdown(data) {
 
     const text = d3.select("#dropdown-options").property("value");
     let optionValues = text
-    .split("\n")
-    .map(line => line.trim())
-    .filter(line => line.length > 0 && line.includes(";")) // nur sinnvolle Zeilen!
-    .map(line => {
-        const parts = line.split(';');
-        return {
-            value: parts[0].trim(),
-            shortcut: parts[1] ? parts[1].trim() : ''
-        };
-    });
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => {
+            const parts = line.split(';');
+            return {
+                value: parts[0].trim(),
+                shortcut: parts[1] ? parts[1].trim() : '',
+                selected: false
+            };
+        });
 
-
-
-
-    // drop empty value if it is last
-    const last = optionValues.pop();
-    if (last !== "") {
-        optionValues.push(last);
-    }
-
-    if (optionValues.some((value) => value < 1 || value > 50)) {
+    if (optionValues.length === 0) {
         d3.select("#dropdown-options").classed("is-invalid", true);
         invalid = true;
     } else {
         d3.select("#dropdown-options").classed("is-invalid", false);
     }
+
     if (invalid) {
         return;
     }
 
+    // Set the first option as selected by default
     if (optionValues.length > 0) {
-        optionValues[0] = { ...optionValues[0], selected: true };
+        optionValues[0].selected = true;
     }
 
     let details = getDetails();
     const newDetail = {
         type: "dropdown",
-        title: title,
-        id: createId(title),
+        title: data && data.isDefault ? data.title : title,  // Keep original title for default dropdowns
+        id: data && data.isDefault ? data.id : createId(title),  // Keep original ID for default dropdowns
         options: optionValues,
         editable: true,
+        isDefault: data ? data.isDefault : false  // Preserve isDefault property
     };
     if (data) {
         let i = _.findIndex(details, data);

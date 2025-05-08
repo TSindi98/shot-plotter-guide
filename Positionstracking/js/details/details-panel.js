@@ -23,6 +23,7 @@ import { getNumRows } from "../table/table-functions.js";
 function setUpDetailsPanel(id = "#details") {
     if (!getCustomSetup()) {
         setCustomSetup(getDefaultSetup());
+        initializeEditableDetails();
     }
 
     createDetailsPanel(id);

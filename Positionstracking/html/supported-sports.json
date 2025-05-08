@@ -1833,6 +1833,17 @@
                         { "value": "Block", "shortcut": "3" },
                         { "value": "Miss", "shortcut": "4" }
                     ]
+                },
+                {
+                    "type": "dropdown",
+                    "title": "Probe",
+                    "id": "Probe-dropdown",
+                    "options": [
+                        { "value": "P5", "shortcut": "5", "selected": true },
+                        { "value": "P6", "shortcut": "6" },
+                        { "value": "P7", "shortcut": "7" },
+                        { "value": "P8", "shortcut": "8" }
+                    ]
                 }
             ]
         },

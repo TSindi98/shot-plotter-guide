@@ -62,7 +62,7 @@ function createDropdown(selectId, { id, title, options }) {
         .attr("id", id + "-select")
         .attr("class", "select2");
 
-    options.forEach((option, index) => {
+    options.forEach((option) => {
         const optionText = option.shortcut
             ? `${option.value} (${option.shortcut})`
             : option.value;
@@ -73,16 +73,11 @@ function createDropdown(selectId, { id, title, options }) {
             .attr("value", option.value)
             .attr("selected", option.selected);
 
-        console.log(`Option ${index}:`, option);
-
         if (option.shortcut) {
-            console.log(`  → Registering shortcut: ${option.shortcut} for value: ${option.value}`);
             shortcutToDropdown.set(option.shortcut, {
                 selectId: `${id}-select`,
                 value: option.value,
             });
-        } else {
-            console.warn(`  ⚠️ Option ${index} has no shortcut`);
         }
     });
 }

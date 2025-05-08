@@ -139,12 +139,16 @@ function saveCurrentSetup() {
                                 .select("select")
                                 .property("value");
                             detail.options = detail.options.map(function (o) {
-                                let option = { value: o.value };
-                                if (o.value === selectedValue) {
-                                    option.selected = true;
-                                }
+                                let option = { 
+                                    value: o.value,
+                                    shortcut: o.shortcut || '',
+                                    selected: o.value === selectedValue
+                                };
                                 return option;
                             });
+                            // Preserve editable and isDefault properties for dropdowns
+                            detail.editable = true;
+                            detail.isDefault = detail.isDefault || false;  // Preserve isDefault property
                             break;
                         case "radio":
                             // save current selection
@@ -181,6 +185,38 @@ function saveCurrentSetup() {
     setCustomSetup(customSetup);
 }
 
+function convertDefaultToEditable(detail) {
+    if (detail.type === "dropdown") {
+        return {
+            ...detail,
+            editable: true,
+            isDefault: true,  // Mark JSON dropdowns as default
+            options: detail.options.map(option => ({
+                ...option,
+                shortcut: option.shortcut || '',
+                selected: option.selected || false
+            }))
+        };
+    }
+    return {
+        ...detail,
+        isDefault: false  // Mark non-dropdowns as non-default
+    };
+}
+
+function initializeEditableDetails() {
+    const defaultSetup = getDefaultSetup();
+    // Set isDefault for dropdowns before converting to editable
+    defaultSetup.details.forEach(detail => {
+        if (detail.type === "dropdown") {
+            detail.isDefault = true;
+        }
+    });
+    const defaultDetails = defaultSetup.details.map(convertDefaultToEditable);
+    setDetails(defaultDetails);
+    createReorderColumns("#reorder");
+}
+
 export {
     getDetails,
     setDetails,
@@ -190,4 +226,6 @@ export {
     changePage,
     createId,
     saveCurrentSetup,
+    convertDefaultToEditable,
+    initializeEditableDetails
 };

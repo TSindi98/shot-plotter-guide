@@ -69,9 +69,25 @@ function createMainPage(id) {
         .attr("class", "btn grey-btn small-text")
         .text("Reset to Defaults")
         .on("click", () => {
-            setCustomSetup(getDefaultSetup());
+            const defaultSetup = getDefaultSetup();
+            // Convert default details to editable format
+            defaultSetup.details = defaultSetup.details.map(detail => {
+                if (detail.type === "dropdown") {
+                    return {
+                        ...detail,
+                        editable: true,
+                        options: detail.options.map(option => ({
+                            ...option,
+                            shortcut: option.shortcut || '',
+                            selected: option.selected || false
+                        }))
+                    };
+                }
+                return detail;
+            });
+            setCustomSetup(defaultSetup);
             if (existsDetail("#shot-type")) {
-                let options = _.find(getDefaultSetup().details, {
+                let options = _.find(defaultSetup.details, {
                     type: "shot-type",
                     id: "shot-type",
                 }).options;
@@ -211,17 +227,18 @@ function createReorderColumns(id = "#reorder") {
                             changePage("#main-page", pageId);
                         });
                 }
-                d3.select(this)
-                    .append("i")
-                    .attr("class", "bi bi-trash-fill")
-                    .on("click", function () {
-                        let details = getDetails();
-                        _.remove(details, { id: d.id });
-                        setDetails(details);
-                        d3.select("#reorder-columns")
-                            .select(`td[data-id="${d.id}"]`)
-                            .remove();
-                    });
+                if (!d.isDefault) {  // Only show delete icon for non-default dropdowns
+                    d3.select(this)
+                        .append("i")
+                        .attr("class", "bi bi-trash-fill")
+                        .on("click", function () {
+                            let details = getDetails();
+                            let i = _.findIndex(details, d);
+                            details.splice(i, 1);
+                            setDetails(details);
+                            createReorderColumns("#reorder");
+                        });
+                }
             }
         });
     const el = document.getElementById("reorder-columns");
