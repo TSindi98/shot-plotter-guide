@@ -174,9 +174,20 @@ function createReorderColumns(id = "#reorder") {
         .attr("class", "reorder-item")
         .attr("data-id", (d) => d.id)
         .attr("data-type", (d) => d.type);
+
     // text
     v.append("div")
-        .text((d) => d.title)
+        .text((d) => {
+            if (d.type === "dropdown" || d.type === "radio") {
+                // Sammle alle Shortcuts für diese Option
+                const shortcuts = d.options
+                    .filter(opt => opt.shortcut)
+                    .map(opt => `${opt.value} (${opt.shortcut})`)
+                    .join(", ");
+                return shortcuts ? `${d.title} [${shortcuts}]` : d.title;
+            }
+            return d.title;
+        })
         .attr("class", "center");
 
     // icons
@@ -197,7 +208,7 @@ function createReorderColumns(id = "#reorder") {
                                 : "bi bi-eye-fill";
                         d3.select(this).attr("class", newClass);
                     });
-                if (d.editable) {
+                if (d.editable || d.isDefault) {
                     d3.select(this)
                         .append("i")
                         .attr("class", "bi bi-pencil-square")
@@ -227,7 +238,7 @@ function createReorderColumns(id = "#reorder") {
                             changePage("#main-page", pageId);
                         });
                 }
-                if (!d.isDefault) {  // Only show delete icon for non-default dropdowns
+                if (!d.isDefault) {  // Only show delete icon for non-default items
                     d3.select(this)
                         .append("i")
                         .attr("class", "bi bi-trash-fill")
@@ -287,9 +298,23 @@ function saveChanges(e) {
             }
         });
 
-    const visibleDetails = titles.map((x) =>
-        _.find(getDetails(), { id: x.id })
-    );
+    // Get all details and preserve their options and shortcuts
+    const allDetails = getDetails();
+    const visibleDetails = titles.map((x) => {
+        const detail = _.find(allDetails, { id: x.id });
+        if (detail && (detail.type === "dropdown" || detail.type === "radio")) {
+            // Preserve options and shortcuts for dropdowns and radio buttons
+            return {
+                ...detail,
+                options: detail.options.map(option => ({
+                    ...option,
+                    shortcut: option.shortcut || '',
+                    selected: option.selected || false
+                }))
+            };
+        }
+        return detail;
+    });
 
     createTableHeader(visibleDetails);
 
@@ -301,6 +326,7 @@ function saveChanges(e) {
         ...getCustomSetup(),
         rowsPerPage: pageSize,
         widgetsPerRow: widgetsPerRow,
+        details: visibleDetails,
     });
 
     createWidgetTypePage();
@@ -634,7 +660,7 @@ function createSpecialDetailsOptions(id = "#special-details-options") {
             .attr("class", "form-check-input")
             .attr("type", "checkbox")
             .attr("id", id)
-            .property("checked", _.find(getDetails(), ["id", newDetails[0].id]))
+            .property("checked", id === "two-point-enable" || id === "distance-calc" || _.find(getDetails(), ["id", newDetails[0].id]))
             .on("click", function () {
                 let checked = d3.select("#" + id).property("checked");
                 let extraDetails = [];

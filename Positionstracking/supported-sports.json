@@ -1866,10 +1866,8 @@
                     "title": "Half",
                     "id": "half",
                     "options": [
-                        { "value": "1", "checked": true },
-                        { "value": "2" },
-                        { "value": "OT1" },
-                        { "value": "OT2" }
+                        { "value": "1", "shortcut": "c", "checked": true },
+                        { "value": "2", "shortcut": "d" }
                     ]
                 },
                 {

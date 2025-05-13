@@ -32,13 +32,11 @@
                 },
                 {
                     "type": "radio",
-                    "title": "Period",
-                    "id": "period",
+                    "title": "Half",
+                    "id": "half",
                     "options": [
-                        { "value": "1", "checked": true },
-                        { "value": "2" },
-                        { "value": "3" },
-                        { "value": "OT" }
+                        { "value": "1", "shortcut": "c", "checked": true },
+                        { "value": "3", "shortcut": "d" }
                     ]
                 },
                 {
@@ -1799,8 +1797,8 @@
                     "title": "Half",
                     "id": "half",
                     "options": [
-                        { "value": "1", "checked": true },
-                        { "value": "2" }
+                        { "value": "1", "shortcut": "", "checked": true },
+                        { "value": "2", "shortcut": "" }
                     ]
                 },
                 {
@@ -1811,14 +1809,12 @@
                     "defaultValue": "00:00"
                 },
                 {
-                    "type": "shot-type",
-                    "title": "Type",
-                    "id": "shot-type",
+                    "type": "radio",
+                    "title": "Outcome",
+                    "id": "outcome",
                     "options": [
-                        { "value": "Shot", "selected": true },
-                        { "value": "Goal" },
-                        { "value": "Block" },
-                        { "value": "Miss" }
+                        { "value": "Erfolgreich", "shortcut": "1", "checked": true },
+                        { "value": "Nicht_Erfolgreich", "shortcut": "2" }
                     ]
                 },
                 { "type": "x", "title": "X", "id": "x", "noWidget": true },
@@ -1828,21 +1824,10 @@
                     "title": "Shot Type",
                     "id": "shot-type-dropdown",
                     "options": [
-                        { "value": "Shot", "shortcut": "1", "selected": true },
-                        { "value": "Goal", "shortcut": "2" },
-                        { "value": "Block", "shortcut": "3" },
-                        { "value": "Miss", "shortcut": "4" }
-                    ]
-                },
-                {
-                    "type": "dropdown",
-                    "title": "Probe",
-                    "id": "Probe-dropdown",
-                    "options": [
-                        { "value": "P5", "shortcut": "5", "selected": true },
-                        { "value": "P6", "shortcut": "6" },
-                        { "value": "P7", "shortcut": "7" },
-                        { "value": "P8", "shortcut": "8" }
+                        { "value": "Shot", "shortcut": "s" },
+                        { "value": "Goal", "shortcut": "g" },
+                        { "value": "Block", "shortcut": "b" },
+                        { "value": "Pass", "shortcut": "p", "selected": true }
                     ]
                 }
             ]

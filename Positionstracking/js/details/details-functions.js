@@ -86,6 +86,25 @@ function createId(title) {
     return id;
 }
 
+function convertDefaultToEditable(detail) {
+    if (detail.type === "dropdown") {
+        return {
+            ...detail,
+            editable: true,
+            isDefault: true,  // Mark JSON dropdowns as default
+            options: detail.options.map(option => ({
+                ...option,
+                shortcut: option.shortcut || '',
+                selected: option.selected || false
+            }))
+        };
+    }
+    return {
+        ...detail,
+        isDefault: false  // Mark non-dropdowns as non-default
+    };
+}
+
 function saveCurrentSetup() {
     // based on select2, reorder and tag with hidden
     const details = getDetails("details");
@@ -146,9 +165,6 @@ function saveCurrentSetup() {
                                 };
                                 return option;
                             });
-                            // Preserve editable and isDefault properties for dropdowns
-                            detail.editable = true;
-                            detail.isDefault = detail.isDefault || false;  // Preserve isDefault property
                             break;
                         case "radio":
                             // save current selection
@@ -156,10 +172,11 @@ function saveCurrentSetup() {
                                 .select(`input[name='${detail.id}']:checked`)
                                 .property("value");
                             detail.options = detail.options.map(function (o) {
-                                let option = { value: o.value };
-                                if (o.value === checkedValue) {
-                                    option.checked = true;
-                                }
+                                let option = { 
+                                    value: o.value,
+                                    shortcut: o.shortcut || '',
+                                    checked: o.value === checkedValue
+                                };
                                 return option;
                             });
                             break;
@@ -183,25 +200,6 @@ function saveCurrentSetup() {
         twoPointEnable: d3.select("#two-point-enable").property("checked"),
     };
     setCustomSetup(customSetup);
-}
-
-function convertDefaultToEditable(detail) {
-    if (detail.type === "dropdown") {
-        return {
-            ...detail,
-            editable: true,
-            isDefault: true,  // Mark JSON dropdowns as default
-            options: detail.options.map(option => ({
-                ...option,
-                shortcut: option.shortcut || '',
-                selected: option.selected || false
-            }))
-        };
-    }
-    return {
-        ...detail,
-        isDefault: false  // Mark non-dropdowns as non-default
-    };
 }
 
 function initializeEditableDetails() {

@@ -4,7 +4,7 @@ import {
     setDetails,
     createId,
 } from "../details-functions.js";
-import { createRadioButtons } from "../widgets/widgets-base.js";
+import { createRadioButtons, validateShortcut, normalizeShortcut } from "../widgets/widgets-base.js";
 import { createReorderColumns } from "./main-page.js";
 
 function createRadioButtonsPage(id, data) {
@@ -26,8 +26,8 @@ function createRadioButtonsPage(id, data) {
         .attr("id", "radio-buttons-page-example")
         .attr("class", "center example");
     let defaultOptions = [
-        { value: "Option 1" },
-        { value: "Option 2", checked: true },
+        { value: "Option 1", shortcut: "1" },
+        { value: "Option 2", shortcut: "2", checked: true },
     ];
     createRadioButtons(
         "#radio-buttons-page-example",
@@ -62,7 +62,15 @@ function createRadioButtonsPage(id, data) {
         .attr("type", "text")
         .attr("class", "form-control")
         .attr("id", "radio-buttons-title")
-        .property("value", data ? data.title : "");
+        .property("value", data ? data.title : "")
+        .property("readonly", data && data.isDefault)
+        .property("disabled", data && data.isDefault)
+        .on("keydown", function(e) {
+            if (data && data.isDefault) {
+                e.preventDefault();
+                return false;
+            }
+        });
     nameDiv
         .append("div")
         .attr("class", "invalid-tooltip")
@@ -81,8 +89,12 @@ function createRadioButtonsPage(id, data) {
         .text("Options");
     optionsDiv.append("div").attr("id", "radio-buttons-options");
 
-    const options = data ? data.options : defaultOptions;
-    options.forEach(createOption);
+    const options = data ? data.options.map(opt => ({
+        value: opt.value,
+        shortcut: opt.shortcut || '',
+        checked: opt.checked || false
+    })) : defaultOptions;
+    options.forEach(option => createOption(option, data && data.isDefault));
     createAddOptionButton();
     optionsDiv
         .append("div")
@@ -133,10 +145,27 @@ function createOption(option, number) {
         .attr("id", `new-radio-${number}`)
         .attr("value", `radio-option-${number}`)
         .attr("checked", option.checked);
-    div.append("input")
+
+    // Container für Option und Shortcut
+    let inputContainer = div.append("div")
+        .attr("class", "d-flex align-items-center gap-2");
+
+    // Option Input
+    inputContainer.append("input")
         .attr("type", "text")
         .attr("class", "form-control")
-        .attr("value", option.value);
+        .attr("placeholder", "Option")
+        .attr("value", option.value)
+        .attr("data-original-value", option.value);
+
+    // Shortcut Input
+    inputContainer.append("input")
+        .attr("type", "text")
+        .attr("class", "form-control")
+        .attr("placeholder", "Shortcut")
+        .attr("value", option.shortcut || "")
+        .attr("data-original-shortcut", option.shortcut || "");
+
     if (number > 2) {
         div.append("i")
             .attr("class", "bi bi-trash-fill")
@@ -164,6 +193,7 @@ function createAddOptionButton(id = "#radio-buttons-page") {
             }
         });
 }
+
 function getNumOptions(id = "#radio-buttons-page") {
     return d3
         .select(id)
@@ -186,18 +216,30 @@ function createNewRadioButtons(data) {
     } else {
         d3.select("#radio-buttons-title").classed("is-invalid", false);
     }
+
+    // Sammle alle Optionen und Shortcuts
     let options = [];
     const selected = d3
         .select(`input[name="radio-buttons-options"]:checked`)
         .property("value");
+
+    // Validiere und sammle Optionen
     d3.select("#radio-buttons-options")
         .selectAll(".new-option")
         .each(function() {
             let option = {};
-            option.value = d3
-                .select(this)
-                .select("input[type='text']")
-                .property("value");
+            let inputs = d3.select(this).selectAll("input[type='text']");
+            const valueInput = inputs.nodes()[0];
+            const shortcutInput = inputs.nodes()[1];
+            
+            option.value = valueInput.value.trim();
+            const shortcut = shortcutInput.value.trim();
+            
+            // Setze den Shortcut direkt
+            if (shortcut) {
+                option.shortcut = shortcut;
+            }
+
             if (selected === d3.select(this).attr("id")) {
                 option.checked = true;
             }
@@ -214,6 +256,7 @@ function createNewRadioButtons(data) {
     } else {
         d3.select("#radio-buttons-options").classed("is-invalid", false);
     }
+
     if (invalid) {
         return;
     }

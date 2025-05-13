@@ -1,5 +1,20 @@
 import { cfgDetails } from "../config-details.js";
 
+// Globale Map für Shortcuts
+const shortcutToDropdown = new Map();
+
+// Hilfsfunktion zum Normalisieren von Shortcuts
+function normalizeShortcut(shortcut) {
+    return shortcut ? shortcut.toLowerCase().trim() : '';
+}
+
+// Hilfsfunktion zum Validieren von Shortcuts
+function validateShortcut(shortcut, existingShortcuts = new Set()) {
+    if (!shortcut) return true; // Leere Shortcuts sind erlaubt
+    const normalized = normalizeShortcut(shortcut);
+    return normalized.length > 0 && !existingShortcuts.has(normalized);
+}
+
 function createRadioButtons(selectId, { id, title, options }) {
     d3.select(selectId)
         .append("div")
@@ -9,23 +24,58 @@ function createRadioButtons(selectId, { id, title, options }) {
         .text(title)
         .attr("class", "center");
 
+    // Sammle existierende Shortcuts
+    const existingShortcuts = new Set();
+    options.forEach(option => {
+        if (option.shortcut) {
+            existingShortcuts.add(normalizeShortcut(option.shortcut));
+        }
+    });
+
     for (let option of options) {
         let div = d3
             .select("#" + id)
             .append("div")
             .attr("class", "form-check vertical");
 
-        div.append("input")
+        // Erstelle das Radio-Input-Element
+        let radioInput = div.append("input")
             .attr("class", "form-check-input")
             .attr("type", "radio")
             .attr("name", id)
-            .attr("id", option.value) // sanitize, make sure no duplicate values
+            .attr("id", option.value)
             .attr("value", option.value)
             .attr("checked", option.checked);
-        div.append("label")
+
+        // Erstelle das Label mit Shortcut-Anzeige
+        let labelText = option.value;
+        if (option.shortcut) {
+            labelText += ` (${option.shortcut})`;
+            // Füge den Shortcut zur Map hinzu
+            shortcutToDropdown.set(normalizeShortcut(option.shortcut), {
+                selectId: id,
+                value: option.value,
+                type: "radio"
+            });
+        }
+
+        // Erstelle das Label-Element
+        let label = div.append("label")
             .attr("class", "form-check-label")
             .attr("for", option.value)
-            .text(option.value);
+            .text(labelText);
+
+        // Füge Event-Listener für Änderungen hinzu
+        radioInput.on("change", function() {
+            // Aktualisiere die Shortcut-Map wenn sich die Auswahl ändert
+            if (option.shortcut) {
+                shortcutToDropdown.set(normalizeShortcut(option.shortcut), {
+                    selectId: id,
+                    value: option.value,
+                    type: "radio"
+                });
+            }
+        });
     }
 }
 
@@ -62,6 +112,14 @@ function createDropdown(selectId, { id, title, options }) {
         .attr("id", id + "-select")
         .attr("class", "select2");
 
+    // Sammle existierende Shortcuts
+    const existingShortcuts = new Set();
+    options.forEach(option => {
+        if (option.shortcut) {
+            existingShortcuts.add(normalizeShortcut(option.shortcut));
+        }
+    });
+
     options.forEach((option) => {
         const optionText = option.shortcut
             ? `${option.value} (${option.shortcut})`
@@ -74,27 +132,51 @@ function createDropdown(selectId, { id, title, options }) {
             .attr("selected", option.selected);
 
         if (option.shortcut) {
-            shortcutToDropdown.set(option.shortcut, {
+            shortcutToDropdown.set(normalizeShortcut(option.shortcut), {
                 selectId: `${id}-select`,
                 value: option.value,
+                type: "dropdown"
             });
         }
     });
 }
 
-// Event-Listener für Tastaturbefehle
-document.addEventListener('keydown', function(event) {
-    options.forEach((option) => {
-        // Überprüfen, ob der Shortcut gedrückt wurde
-        if (event.key === option.shortcut) { // Verwende event.key
-            const dropdownId = `#${id}-select`;
-            d3.select(dropdownId).property('value', option.value); // Setze den Wert basierend auf dem Shortcut
-            console.log(`Setting dropdown value to: ${option.value}`); // Log für Debugging
+// Modifiziere den Event-Listener für Tastaturbefehle
+document.addEventListener("keydown", (event) => {
+    // Normalisiere den Tastendruck für bessere Browser-Kompatibilität
+    const key = event.key.toLowerCase();
+    
+    // Ignoriere Tastendrücke wenn ein Eingabefeld fokussiert ist
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+        return;
+    }
+    
+    for (const [shortcut, { selectId, value, type }] of shortcutToDropdown.entries()) {
+        if (key === shortcut) {
+            event.preventDefault(); // Verhindere Standard-Browser-Verhalten
             
+            if (type === "radio") {
+                // Für Radio Buttons
+                const radioInput = d3.select(`#${selectId}`)
+                    .select(`input[value="${value}"]`);
+                
+                if (!radioInput.empty()) {
+                    radioInput
+                        .property("checked", true)
+                        .dispatch("change", { bubbles: true });
+                }
+            } else {
+                // Für Dropdowns
+                const dropdown = d3.select(`#${selectId}`);
+                if (!dropdown.empty()) {
+                    dropdown
+                        .property("value", value)
+                        .dispatch("change", { bubbles: true });
+                }
+            }
         }
-    });
+    }
 });
-
 
 function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
     let div = d3
@@ -135,24 +217,13 @@ function createTimeWidget(selectId, { id, title, defaultTime, countdown }) {
     }
 }
 
-
-
-const shortcutToDropdown = new Map();
-
-document.addEventListener("keydown", (event) => {
-    for (const [shortcut, { selectId, value }] of shortcutToDropdown.entries()) {
-        if (event.key === shortcut) {
-            d3.select(`#${selectId}`).property("value", value).dispatch("change");
-        }
-    }
-});
-
-
 export {
     createRadioButtons,
     createTextField,
     createDropdown,
     createTimeWidget,
     shortcutToDropdown,
+    normalizeShortcut,
+    validateShortcut
 };
 

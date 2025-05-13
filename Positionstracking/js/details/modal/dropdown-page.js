@@ -4,7 +4,7 @@ import {
     setDetails,
     createId,
 } from "../details-functions.js";
-import { createDropdown } from "../widgets/widgets-base.js";
+import { createDropdown, validateShortcut, normalizeShortcut } from "../widgets/widgets-base.js";
 import { createReorderColumns } from "./main-page.js";
 
 function createDropdownPage(id, data) {
@@ -31,17 +31,17 @@ function createDropdownPage(id, data) {
                   id: "sample-dropdown",
                   title: "Detail Name",
                   options: [
-                      { value: "Option 1 (Ctrl+1)", selected: true },
-                      { value: "Option 2 (Ctrl+2)" },
+                      { value: "Option 1", shortcut: "1", selected: true },
+                      { value: "Option 2", shortcut: "2" },
                   ],
               }
     );
 
     mb.append("div").text(
-        "Enter the detail name. Then, input a list of options for the dropdown, each option on a new line. The first option will be the default selection."
+        "Enter the detail name and create options for the dropdown. There must be 2-5 options. Also select which option should be selected by default."
     );
     mb.append("hr");
-    // text field
+    // title
     let form = mb
         .append("form")
         .attr("class", "need-validation")
@@ -62,10 +62,6 @@ function createDropdownPage(id, data) {
         .property("value", data ? data.title : "")
         .property("readonly", data && data.isDefault)
         .property("disabled", data && data.isDefault)
-        .style("background-color", data && data.isDefault ? "#e9ecef" : "")
-        .style("pointer-events", data && data.isDefault ? "none" : "")
-        .style("user-select", data && data.isDefault ? "none" : "")
-        .style("opacity", data && data.isDefault ? "0.7" : "1")
         .on("keydown", function(e) {
             if (data && data.isDefault) {
                 e.preventDefault();
@@ -79,41 +75,33 @@ function createDropdownPage(id, data) {
             "Detail names must be 1-16 characters long, and can only contain alphanumeric characters, dashes, underscores, and spaces."
         );
 
+    // options
     let optionsDiv = form
         .append("div")
-        .attr("class", "form-group position-relative");
+        .attr("class", "form-group position-relative")
+        .attr("id", "options-div");
     optionsDiv
         .append("label")
-        .attr("for", "dropdown-field-default-text")
+        .attr("for", "dropdown-options")
         .attr("class", "form-label")
-        .text("Options (and Shortcuts)");
-    
-    let optionsTextarea = optionsDiv
-        .append("textarea")
-        .attr("class", "form-control textarea")
-        .attr("id", "dropdown-options")
-        .attr("rows", "10");
-    
-    if (data && Array.isArray(data.options)) {
-        const validLines = data.options
-            .filter(x => x.value && x.value.trim() !== "") // nur sinnvolle Optionen
-            .map(x => {
-                const value = x.value.trim();
-                const shortcut = x.shortcut !== undefined ? x.shortcut.trim() : '';
-                return `${value} ; ${shortcut}`;
-            });
-    
-        optionsTextarea.text(validLines.join("\n"));
-    } else {
-        optionsTextarea.text("Option 1 ; 1\nOption 2 ; 2\n");
-    }
-    
-    // Tooltip für die Optionen
+        .text("Options");
+    optionsDiv.append("div").attr("id", "dropdown-options");
+
+    const defaultOptions = [
+        { value: "Option 1", shortcut: "1" },
+        { value: "Option 2", shortcut: "2", selected: true },
+    ];
+    const options = data ? data.options.map(opt => ({
+        value: opt.value,
+        shortcut: opt.shortcut || '',
+        selected: opt.selected || false
+    })) : defaultOptions;
+    options.forEach(option => createOption(option, data && data.isDefault));
+    createAddOptionButton();
     optionsDiv
         .append("div")
         .attr("class", "invalid-tooltip")
-        .text("Each option must be 1-50 characters long, and can include a shortcut in parentheses. If you don't want to use a shortcut, just leave the parentheses empty.");
-
+        .text("Options must be 1-32 characters long and unique.");
 
     // footer
     let footer = d3.select(id).append("div").attr("class", "footer-row");
@@ -138,15 +126,81 @@ function createDropdownPage(id, data) {
             "click",
             data ? () => createNewDropdown(data) : () => createNewDropdown()
         );
+}
 
-    $("#sample-dropdown-select").select2({
-        dropdownParent: $("#sample-dropdown"),
-        width: "100%",
-        dropdownCssClass: "small-text",
-    });
+function createOption(option, number) {
+    number += 1;
+    let div = d3
+        .select("#dropdown-options")
+        .append("div")
+        .attr("class", "form-check new-option")
+        .attr("id", `dropdown-option-${number}`);
+
+    div.append("input")
+        .attr("class", "form-check-input")
+        .attr("type", "radio")
+        .attr("name", "dropdown-options")
+        .attr("id", `new-dropdown-${number}`)
+        .attr("value", `dropdown-option-${number}`)
+        .attr("checked", option.selected);
+
+    // Container für Option und Shortcut
+    let inputContainer = div.append("div")
+        .attr("class", "d-flex align-items-center gap-2");
+
+    // Option Input
+    inputContainer.append("input")
+        .attr("type", "text")
+        .attr("class", "form-control")
+        .attr("placeholder", "Option")
+        .attr("value", option.value)
+        .attr("data-original-value", option.value);
+
+    // Shortcut Input
+    inputContainer.append("input")
+        .attr("type", "text")
+        .attr("class", "form-control")
+        .attr("placeholder", "Shortcut")
+        .attr("value", option.shortcut || "")
+        .attr("data-original-shortcut", option.shortcut || "");
+
+    if (number > 2) {
+        div.append("i")
+            .attr("class", "bi bi-trash-fill")
+            .on("click", () => {
+                d3.select(`#dropdown-option-${number}`).remove();
+                if (getNumOptions() === 4) {
+                    createAddOptionButton();
+                }
+            });
+    }
+}
+
+function createAddOptionButton(id = "#dropdown-page") {
+    d3.select(id)
+        .select("#options-div")
+        .append("button")
+        .text("Add Option")
+        .attr("class", "grey-btn add-option-btn")
+        .on("click", function(e) {
+            e.preventDefault();
+            let number = getNumOptions();
+            createOption({ value: `Option ${number + 1}` }, number);
+            if (number >= 5) {
+                d3.select(this).remove();
+            }
+        });
+}
+
+function getNumOptions(id = "#dropdown-page") {
+    return d3
+        .select(id)
+        .selectAll(".new-option")
+        .size();
 }
 
 function createNewDropdown(data) {
+    // input sanitization
     let invalid = false;
 
     const title = d3.select("#dropdown-title").property("value");
@@ -161,21 +215,40 @@ function createNewDropdown(data) {
         d3.select("#dropdown-title").classed("is-invalid", false);
     }
 
-    const text = d3.select("#dropdown-options").property("value");
-    let optionValues = text
-        .split("\n")
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .map(line => {
-            const parts = line.split(';');
-            return {
-                value: parts[0].trim(),
-                shortcut: parts[1] ? parts[1].trim() : '',
-                selected: false
-            };
+    // Sammle alle Optionen und Shortcuts
+    let options = [];
+    const selected = d3
+        .select(`input[name="dropdown-options"]:checked`)
+        .property("value");
+
+    // Validiere und sammle Optionen
+    d3.select("#dropdown-options")
+        .selectAll(".new-option")
+        .each(function() {
+            let option = {};
+            let inputs = d3.select(this).selectAll("input[type='text']");
+            const valueInput = inputs.nodes()[0];
+            const shortcutInput = inputs.nodes()[1];
+            
+            option.value = valueInput.value.trim();
+            const shortcut = shortcutInput.value.trim();
+            
+            // Setze den Shortcut direkt
+            if (shortcut) {
+                option.shortcut = shortcut;
+            }
+
+            if (selected === d3.select(this).attr("id")) {
+                option.selected = true;
+            }
+            options.push(option);
         });
 
-    if (optionValues.length === 0) {
+    let optionValues = options.map(x => x.value);
+    if (
+        optionValues.some(value => value.length < 1 || value.length > 32) ||
+        !_.isEqual(optionValues, _.uniq(optionValues))
+    ) {
         d3.select("#dropdown-options").classed("is-invalid", true);
         invalid = true;
     } else {
@@ -186,19 +259,14 @@ function createNewDropdown(data) {
         return;
     }
 
-    // Set the first option as selected by default
-    if (optionValues.length > 0) {
-        optionValues[0].selected = true;
-    }
-
+    // actual creation
     let details = getDetails();
     const newDetail = {
         type: "dropdown",
-        title: data && data.isDefault ? data.title : title,  // Keep original title for default dropdowns
-        id: data && data.isDefault ? data.id : createId(title),  // Keep original ID for default dropdowns
-        options: optionValues,
+        title: title,
+        id: createId(title),
+        options: options,
         editable: true,
-        isDefault: data ? data.isDefault : false  // Preserve isDefault property
     };
     if (data) {
         let i = _.findIndex(details, data);

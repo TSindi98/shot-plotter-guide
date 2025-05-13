@@ -49,9 +49,9 @@ export function setup(s) {
         perimeterId = sportData.perimeter;
         getDefaultSetup = function () {
             const details = _.cloneDeep(sportData.defaultDetails);
-            // Set isDefault for dropdowns from JSON
+            // Set isDefault for dropdowns and radio buttons from JSON
             details.forEach(detail => {
-                if (detail.type === "dropdown") {
+                if (detail.type === "dropdown" || detail.type === "radio") {
                     detail.isDefault = true;
                 }
             });
