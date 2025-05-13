@@ -516,7 +516,14 @@
             });
 
             // Tastatursteuerung für das Video
+            let lastKeyPress = 0;
+            const keyPressDelay = 200; // Mindestzeit zwischen zwei Tastendrücken in Millisekunden
+            let isFastForwarding = false;
+            let isRewinding = false;
+
             document.addEventListener('keydown', function(event) {
+                const now = Date.now();
+                
                 // Überprüfe, ob die Leertaste gedrückt wurde
                 if (event.code === 'Space') {
                     event.preventDefault(); // Verhindert das Scrollen der Seite
@@ -530,16 +537,31 @@
                 // Überprüfe, ob die Pfeiltasten gedrückt wurden
                 if ((event.code === 'ArrowRight' || event.code === 'ArrowLeft')) {
                     event.preventDefault(); // Verhindert das Scrollen der Seite
-                    const skipTime = parseInt(document.getElementById('skip-time').value) || 3;
                     
                     if (event.metaKey || event.ctrlKey) { // Cmd (Mac) oder Ctrl (Windows) gedrückt
                         // Doppelte Geschwindigkeit beim Halten der Taste
-                        if (event.code === 'ArrowRight') {
+                        if (event.code === 'ArrowRight' && !isFastForwarding) {
+                            isFastForwarding = true;
                             gameVideo.playbackRate = 2.0;
-                        } else if (event.code === 'ArrowLeft') {
+                            if (gameVideo.paused) {
+                                gameVideo.play();
+                            }
+                        } else if (event.code === 'ArrowLeft' && !isRewinding) {
+                            isRewinding = true;
                             gameVideo.playbackRate = -2.0;
+                            if (gameVideo.paused) {
+                                gameVideo.play();
+                            }
                         }
                     } else {
+                        // Prüfe, ob genug Zeit seit dem letzten Tastendruck vergangen ist
+                        if (now - lastKeyPress < keyPressDelay) {
+                            return;
+                        }
+                        lastKeyPress = now;
+                        
+                        const skipTime = parseInt(document.getElementById('skip-time').value) || 3;
+                        
                         // Normale Zeitsprünge bei einzelnen Tastendrücken
                         if (event.code === 'ArrowRight') {
                             gameVideo.currentTime += skipTime;
@@ -552,7 +574,19 @@
 
             // Setze die Wiedergabegeschwindigkeit zurück, wenn die Taste losgelassen wird
             document.addEventListener('keyup', function(event) {
-                if (event.code === 'ArrowRight' || event.code === 'ArrowLeft' || event.key === 'Meta' || event.key === 'Control') {
+                if (event.code === 'ArrowRight') {
+                    isFastForwarding = false;
+                    if (!isRewinding) {
+                        gameVideo.playbackRate = 1.0;
+                    }
+                } else if (event.code === 'ArrowLeft') {
+                    isRewinding = false;
+                    if (!isFastForwarding) {
+                        gameVideo.playbackRate = 1.0;
+                    }
+                } else if (event.key === 'Meta' || event.key === 'Control') {
+                    isFastForwarding = false;
+                    isRewinding = false;
                     gameVideo.playbackRate = 1.0;
                 }
             });
