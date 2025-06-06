@@ -142,6 +142,7 @@ function createMainPage(id) {
         .text("Save Changes")
         .on("click", (e) => saveChanges(e));
 
+    // Initialize 2-Location Events if enabled by default
     if (getCustomSetup().twoPointEnable) {
         d3.select("#two-point-enable").property("checked", true);
         d3.select("#heat-map-enable")
@@ -257,85 +258,96 @@ function createReorderColumns(id = "#reorder") {
 }
 
 function saveChanges(e) {
-    if (!resetCustomSetupUploadFlag()) {
-        // custom setup not uploaded, want to use the current values
-        saveCurrentSetup();
-    }
-    allTogglesFunctionality();
+    try {
+        if (!resetCustomSetupUploadFlag()) {
+            // custom setup not uploaded, want to use the current values
+            saveCurrentSetup();
+        }
+        allTogglesFunctionality();
 
-    const pageSize = d3.select("#page-size-field").property("value");
+        const pageSize = d3.select("#page-size-field").property("value");
 
-    if (
-        !Number.isInteger(parseInt(pageSize)) ||
-        pageSize < 1 ||
-        pageSize > 999
-    ) {
-        d3.select("#page-size-field").classed("is-invalid", true);
-        return;
-    }
-    d3.select("#page-size-field").classed("is-invalid", false);
+        if (
+            !Number.isInteger(parseInt(pageSize)) ||
+            pageSize < 1 ||
+            pageSize > 999
+        ) {
+            d3.select("#page-size-field").classed("is-invalid", true);
+            return;
+        }
+        d3.select("#page-size-field").classed("is-invalid", false);
 
-    let titles = [];
-    d3.select("#reorder-columns")
-        .selectAll("td")
-        .each(function () {
-            if (
-                d3
-                    .select(this)
-                    .select(".reorder-item-icons")
-                    .select("i")
-                    .size() === 0 ||
-                d3
-                    .select(this)
-                    .select(".reorder-item-icons")
-                    .select("i")
-                    .attr("class") !== "bi bi-eye-slash-fill"
-            ) {
-                let title = d3.select(this).select(".center").text();
-                let dataId = d3.select(this).attr("data-id");
-                let dataType = d3.select(this).attr("data-type");
-                titles.push({ id: dataId, type: dataType, title: title });
+        let titles = [];
+        d3.select("#reorder-columns")
+            .selectAll("td")
+            .each(function () {
+                try {
+                    const item = d3.select(this);
+                    const iconElement = item.select(".reorder-item-icons").select("i");
+                    
+                    if (iconElement.size() === 0 || 
+                        iconElement.attr("class") !== "bi bi-eye-slash-fill") {
+                        const titleElement = item.select(".center");
+                        if (!titleElement.empty()) {
+                            let title = titleElement.text();
+                            let dataId = item.attr("data-id");
+                            let dataType = item.attr("data-type");
+                            
+                            if (dataId && dataType) {
+                                titles.push({ id: dataId, type: dataType, title: title });
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error processing detail row:", err);
+                }
+            });
+
+        // Get all details and preserve their options and shortcuts
+        const allDetails = getDetails();
+        const visibleDetails = titles.map((x) => {
+            const detail = _.find(allDetails, { id: x.id });
+            if (detail && (detail.type === "dropdown" || detail.type === "radio")) {
+                // Preserve options and shortcuts for dropdowns and radio buttons
+                return {
+                    ...detail,
+                    options: Array.isArray(detail.options) 
+                        ? detail.options.map(option => ({
+                            ...option,
+                            shortcut: option.shortcut || '',
+                            selected: option.selected || false
+                        }))
+                        : []
+                };
             }
+            return detail;
+        }).filter(Boolean); // Remove any null/undefined entries
+
+        createTableHeader(visibleDetails);
+
+        const widgetsPerRowElement = d3.select("#widgets-per-row-dropdown");
+        const widgetsPerRow = widgetsPerRowElement.empty() 
+            ? 1 
+            : parseInt(widgetsPerRowElement.property("value") || "1");
+
+        setCustomSetup({
+            ...getCustomSetup(),
+            rowsPerPage: pageSize,
+            widgetsPerRow: widgetsPerRow,
+            details: visibleDetails,
         });
 
-    // Get all details and preserve their options and shortcuts
-    const allDetails = getDetails();
-    const visibleDetails = titles.map((x) => {
-        const detail = _.find(allDetails, { id: x.id });
-        if (detail && (detail.type === "dropdown" || detail.type === "radio")) {
-            // Preserve options and shortcuts for dropdowns and radio buttons
-            return {
-                ...detail,
-                options: detail.options.map(option => ({
-                    ...option,
-                    shortcut: option.shortcut || '',
-                    selected: option.selected || false
-                }))
-            };
-        }
-        return detail;
-    });
+        createWidgetTypePage();
+        createDetailsPanel("#details");
+        shotTypeLegend();
+        teamLegend();
+        select2Filter();
 
-    createTableHeader(visibleDetails);
-
-    const widgetsPerRow = parseInt(
-        d3.select("#widgets-per-row-dropdown").property("value")
-    );
-
-    setCustomSetup({
-        ...getCustomSetup(),
-        rowsPerPage: pageSize,
-        widgetsPerRow: widgetsPerRow,
-        details: visibleDetails,
-    });
-
-    createWidgetTypePage();
-    createDetailsPanel("#details");
-    shotTypeLegend();
-    teamLegend();
-    select2Filter();
-
-    $("#details-modal").modal("hide"); // default js doesn't work for some reason
+        $("#details-modal").modal("hide"); // default js doesn't work for some reason
+    } catch (err) {
+        console.error("Error in saveChanges:", err);
+        alert("Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu und versuchen Sie es erneut.");
+    }
 }
 
 function createExplainText(id = "#explain-text") {

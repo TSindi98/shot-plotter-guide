@@ -131,60 +131,71 @@ function saveCurrentSetup() {
                     switch (detail.type) {
                         case "team":
                             // save teams
-                            detail.blueTeamName = d
-                                .select("#blue-team-name")
-                                .property("value");
-                            detail.orangeTeamName = d
-                                .select("#orange-team-name")
-                                .property("value");
-                            detail.checked = d3
-                                .select("input[name='team-bool']:checked")
-                                .property("id");
+                            const blueTeamName = d.select("#blue-team-name");
+                            if (!blueTeamName.empty()) {
+                                detail.blueTeamName = blueTeamName.property("value");
+                            }
+                            
+                            const orangeTeamName = d.select("#orange-team-name");
+                            if (!orangeTeamName.empty()) {
+                                detail.orangeTeamName = orangeTeamName.property("value");
+                            }
+                            
+                            const checkedTeam = d3.select("input[name='team-bool']:checked");
+                            if (!checkedTeam.empty()) {
+                                detail.checked = checkedTeam.property("id");
+                            }
                             break;
 
                         case "player":
                         case "text-field":
                             // save current entry
-                            detail["defaultValue"] = d
-                                .select("input")
-                                .property("value");
+                            const textInput = d.select("input");
+                            if (!textInput.empty()) {
+                                detail["defaultValue"] = textInput.property("value");
+                            }
                             break;
                         case "shot-type":
                             detail.options = getCurrentShotTypes();
                             break;
                         case "dropdown":
                             // save currently selected option
-                            let selectedValue = d
-                                .select("select")
-                                .property("value");
-                            detail.options = detail.options.map(function (o) {
-                                let option = { 
-                                    value: o.value,
-                                    shortcut: o.shortcut || '',
-                                    selected: o.value === selectedValue
-                                };
-                                return option;
-                            });
+                            const dropdownSelect = d.select("select");
+                            if (!dropdownSelect.empty()) {
+                                let selectedValue = dropdownSelect.property("value");
+                                detail.options = detail.options.map(function (o) {
+                                    let option = { 
+                                        value: o.value,
+                                        shortcut: o.shortcut || '',
+                                        selected: o.value === selectedValue
+                                    };
+                                    return option;
+                                });
+                            }
                             break;
                         case "radio":
                             // save current selection
-                            let checkedValue = d
-                                .select(`input[name='${detail.id}']:checked`)
-                                .property("value");
-                            detail.options = detail.options.map(function (o) {
-                                let option = { 
-                                    value: o.value,
-                                    shortcut: o.shortcut || '',
-                                    checked: o.value === checkedValue
-                                };
-                                return option;
-                            });
+                            if (detail.id) {
+                                const checkedRadio = d.select(`input[name='${detail.id}']:checked`);
+                                if (!checkedRadio.empty()) {
+                                    let checkedValue = checkedRadio.property("value");
+                                    detail.options = detail.options.map(function (o) {
+                                        let option = { 
+                                            value: o.value,
+                                            shortcut: o.shortcut || '',
+                                            checked: o.value === checkedValue
+                                        };
+                                        return option;
+                                    });
+                                }
+                            }
                             break;
                         case "time":
                             // save current time
-                            detail["defaultTime"] = d
-                                .select("input")
-                                .property("value");
+                            const timeInput = d.select("input");
+                            if (!timeInput.empty()) {
+                                detail["defaultTime"] = timeInput.property("value");
+                            }
                             break;
                     }
                 }

@@ -69,10 +69,16 @@ function downloadCSV(id) {
         });
     csv = csv.slice(0, -1) + "\n";
     const rows = getFilteredRows();
+    
     for (let row of rows) {
         for (let col of _.compact(header)) {
             if (col !== "shot-number") {
-                csv += escape(row.rowData[col].toString()) + ",";
+                // Handle X2 and Y2 coordinates if they exist
+                if ((col === "x2" || col === "y2") && !row.rowData[col]) {
+                    csv += ","; // Add empty value for missing X2/Y2
+                } else {
+                    csv += escape(row.rowData[col].toString()) + ",";
+                }
             }
         }
         // remove trailing comma

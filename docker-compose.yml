@@ -1,40 +1,39 @@
+version: '3'
+
 services:
   shot-plotter:
-    build:
-      context: ./Positionstracking
-      x-bake:
-        platforms:
-          - linux/amd64
-          - linux/arm64
-    image: sindi98/shot-plotter-shot-plotter:v1.1
+    image: sindi98/shot-plotter-shot-plotter:v1.2
+    container_name: shot-plotter
     ports:
       - "8080:8080"
-    networks:
-      - app-network
-    volumes:
-      - ./Positionstracking:/app
     restart: unless-stopped
-    container_name: shot-plotter
+    networks:
+      - shot-plotter-network
 
   data-merging:
-    build:
-      context: ./Datenmerging
-      x-bake:
-        platforms:
-          - linux/amd64
-          - linux/arm64
-    image: sindi98/shot-plotter-data-merging:v1.1
-    ports:
-      - "8502:8501"
-    networks:
-      - app-network
-    volumes:
-      - ./Datenmerging:/app
-    restart: unless-stopped
+    image: sindi98/shot-plotter-data-merging:latest
     container_name: data-merging
-    depends_on:
-      - shot-plotter
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - shot-plotter-network
+
+  streamlit-guide:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    image: sindi98/shot-plotter-guide:latest
+    container_name: shot-plotter-guide
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./videos:/app/videos
+      - ./images:/app/images
+    restart: unless-stopped
+    networks:
+      - shot-plotter-network
 
 networks:
-  app-network:
+  shot-plotter-network:
     driver: bridge 

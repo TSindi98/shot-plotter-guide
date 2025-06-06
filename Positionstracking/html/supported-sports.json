@@ -1793,15 +1793,6 @@
                     "noWidget": true
                 },
                 {
-                    "type": "radio",
-                    "title": "Half",
-                    "id": "half",
-                    "options": [
-                        { "value": "1", "shortcut": "", "checked": true },
-                        { "value": "2", "shortcut": "" }
-                    ]
-                },
-                {
                     "type": "time",
                     "title": "Time",
                     "id": "time",
@@ -1809,27 +1800,82 @@
                     "defaultValue": "00:00"
                 },
                 {
+                    "type": "team",
+                    "title": "Team",
+                    "className": "team-select",
+                    "id": "team",
+                    "blueTeamName": "BVB",
+                    "orangeTeamName": "Gegner",
+                    "checked": "blue-team-select"
+                },
+                {
+                    "type": "radio",
+                    "title": "Halbzeit",
+                    "id": "half",
+                    "options": [
+                        { "value": "1", "checked": true },
+                        { "value": "2" }
+                    ]
+                },
+                {
+                    "type": "radio",
+                    "title": "Gegnerdruck",
+                    "id": "gegnerdruck",
+                    "options": [
+                        { "value": "0", "checked": true },
+                        { "value": "1" },
+                        { "value": "2" },
+                        { "value": "3" },
+                        { "value": "4" }
+                    ]
+                },
+                {
                     "type": "radio",
                     "title": "Outcome",
                     "id": "outcome",
                     "options": [
-                        { "value": "Erfolgreich", "shortcut": "1", "checked": true },
-                        { "value": "Nicht_Erfolgreich", "shortcut": "2" }
+                        { "value": "Erfolgreich", "checked": true },
+                        { "value": "Nicht Erfolgreich" }
                     ]
                 },
-                { "type": "x", "title": "X", "id": "x", "noWidget": true },
-                { "type": "y", "title": "Y", "id": "y", "noWidget": true },
+                {
+                    "type": "radio",
+                    "title": "Passhöhe",
+                    "id": "passhohe",
+                    "options": [
+                        { "value": "Flach", "checked": true },
+                        { "value": "Hoch" },
+                        { "value": "Über Kniehöhe" }
+                    ]
+                },
+                {
+                    "type": "radio",
+                    "title": "Situation",
+                    "id": "situation",
+                    "options": [
+                        { "value": "Aus dem Spiel", "checked": true },
+                        { "value": "Anstoß" },
+                        { "value": "Abstoß" },
+                        { "value": "Ecke" },
+                        { "value": "Freistoß" }
+                    ]
+                },
                 {
                     "type": "dropdown",
-                    "title": "Shot Type",
-                    "id": "shot-type-dropdown",
+                    "title": "Aktionstyp",
+                    "id": "actiontype",
                     "options": [
-                        { "value": "Shot", "shortcut": "s" },
-                        { "value": "Goal", "shortcut": "g" },
-                        { "value": "Block", "shortcut": "b" },
-                        { "value": "Pass", "shortcut": "p", "selected": true }
+                        { "value": "Pass", "checked": true },
+                        { "value": "Schuss"},
+                        { "value": "Dribbling"},
+                        { "value": "Kopfball"},
+                        { "value": "Zweikampf"}
                     ]
-                }
+                },
+               { "type": "x", "title": "X", "id": "x", "noWidget": true },
+                { "type": "y", "title": "Y", "id": "y", "noWidget": true },
+                { "type": "x", "title": "X2", "id": "x2", "noWidget": true },
+                { "type": "y", "title": "Y2", "id": "y2", "noWidget": true }
             ]
         },
         {

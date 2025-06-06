@@ -543,15 +543,9 @@
                         if (event.code === 'ArrowRight' && !isFastForwarding) {
                             isFastForwarding = true;
                             gameVideo.playbackRate = 2.0;
-                            if (gameVideo.paused) {
-                                gameVideo.play();
-                            }
                         } else if (event.code === 'ArrowLeft' && !isRewinding) {
                             isRewinding = true;
                             gameVideo.playbackRate = -2.0;
-                            if (gameVideo.paused) {
-                                gameVideo.play();
-                            }
                         }
                     } else {
                         // Prüfe, ob genug Zeit seit dem letzten Tastendruck vergangen ist
@@ -598,6 +592,9 @@
             integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
             crossorigin="anonymous"
         ></script>
+
+        <button onclick="localStorage.clear(); location.reload();" style="position: fixed; top: 10px; right: 10px; z-index: 9999;">Reset Settings</button>
+        
     </body>
     <footer class="center">
         <span>
