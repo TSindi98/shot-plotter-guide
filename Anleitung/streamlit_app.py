@@ -13,13 +13,29 @@ st.set_page_config(
 # Hilfsfunktion zum Laden von Bildern
 def load_image(image_file):
     try:
-        # Versuche das Bild aus dem images Verzeichnis zu laden
-        image_path = os.path.join("images", image_file)
-        if os.path.exists(image_path):
-            return Image.open(image_path)
-        else:
-            st.warning(f"Bild nicht gefunden: {image_path}")
-            return None
+        # Debug: Zeige das aktuelle Arbeitsverzeichnis
+        st.write(f"Aktuelles Verzeichnis: {os.getcwd()}")
+        
+        # Versuche verschiedene Pfade
+        possible_paths = [
+            os.path.join("images", image_file),  # Relativer Pfad
+            os.path.join("Anleitung", "images", image_file),  # Mit Anleitung Ordner
+            os.path.join(os.getcwd(), "images", image_file),  # Absoluter Pfad
+            os.path.join(os.getcwd(), "Anleitung", "images", image_file)  # Absoluter Pfad mit Anleitung
+        ]
+        
+        # Debug: Zeige alle möglichen Pfade
+        st.write("Suche Bilder in folgenden Pfaden:")
+        for path in possible_paths:
+            st.write(f"- {path} (Existiert: {os.path.exists(path)})")
+        
+        # Versuche jeden Pfad
+        for path in possible_paths:
+            if os.path.exists(path):
+                return Image.open(path)
+        
+        st.warning(f"Bild nicht gefunden: {image_file}")
+        return None
     except Exception as e:
         st.error(f"Fehler beim Laden des Bildes: {str(e)}")
         return None
@@ -52,11 +68,11 @@ if page == "How to start":
         st.markdown(description_before)
         
         # Bild anzeigen
-        image_path = f"images/{step_number}.png"
-        if os.path.exists(image_path):
-            st.image(image_path, use_column_width=True)
+        image = load_image(f"{step_number}.png")
+        if image:
+            st.image(image, use_column_width=True)
         else:
-            st.error(f"Bild '{image_path}' nicht gefunden")
+            st.error(f"Bild für Schritt {step_number} konnte nicht geladen werden")
         
         # Beschreibung nach dem Bild
         st.markdown(description_after)
