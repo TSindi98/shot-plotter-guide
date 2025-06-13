@@ -77,4 +77,4 @@ docker-compose up -d
 
 Bei Fragen oder Problemen:
 - Erstelle ein Issue in diesem Repository
-- Kontaktiere das BVB Kooperationsprojekt Team 
+- Kontaktiere das BVB Kooperationsprojekt Team
