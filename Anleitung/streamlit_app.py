@@ -310,6 +310,21 @@ elif page == "Example Workflow":
         video_type="drive"
     )
 
+    # Spielrichtung und gespiegelte Koordinaten
+    show_workflow_step(
+        3,
+        "Playing Direction and Mirrored Coordinates",
+        """
+        Understanding and handling different playing directions:
+
+        1. Default playing direction is from left to right
+        2. When the game is played from right to left, use the "Gespiegelte Koordinaten" button
+        3. This ensures all data is consistently oriented for analysis
+        """,
+        video_url="https://drive.google.com/file/d/1M9q7B6rdaEzV-qR-WM3Q1D382NYd-Iru/view?usp=drive_link",
+        video_type="drive"
+    )
+
 # Widget Explanation
 elif page == "Widget Explanation":
     st.title("Widget Explanation")
