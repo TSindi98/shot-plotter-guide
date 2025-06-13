@@ -70,7 +70,7 @@ if page == "How to start":
         # Bild anzeigen
         image = load_image(f"{step_number}.png")
         if image:
-            st.image(image, use_column_width=True)
+            st.image(image, use_container_width=True)
         else:
             st.error(f"Bild für Schritt {step_number} konnte nicht geladen werden")
         
@@ -225,7 +225,7 @@ elif page == "Beispielablauf":
         # Bild anzeigen
         image_path = f"images/workflow_{step_number}.png"
         if os.path.exists(image_path):
-            st.image(image_path, use_column_width=True)
+            st.image(image_path, use_container_width=True)
         else:
             st.error(f"Bild '{image_path}' nicht gefunden")
         
@@ -415,7 +415,7 @@ elif page == "Download":
     """)
     docker_hub_pull = load_image("7.png")
     if docker_hub_pull:
-        st.image(docker_hub_pull, caption="Docker Hub Pull", use_column_width=True)
+        st.image(docker_hub_pull, caption="Docker Hub Pull", use_container_width=True)
     
     st.header("Systemanforderungen")
     st.markdown("""
