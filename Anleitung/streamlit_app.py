@@ -46,7 +46,7 @@ def embed_google_drive_video(video_url):
     if file_id:
         # Verwende die direkte Vorschau-URL mit höherer Qualität
         embed_url = f'https://drive.google.com/file/d/{file_id}/preview?autoplay=0&hd=1'
-        return f'<iframe src="{embed_url}" width="100%" height="720" allow="autoplay" style="border: none;"></iframe>'
+        return f'<iframe src="{embed_url}" width="100%" height="1080" allow="autoplay" style="border: none;"></iframe>'
     else:
         st.error("Ungültiger Google Drive Link")
         return None
