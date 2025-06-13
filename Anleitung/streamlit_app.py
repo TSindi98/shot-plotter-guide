@@ -2,6 +2,7 @@ import streamlit as st
 import base64
 import os
 from PIL import Image
+import re
 
 # Konfiguration der Seite
 st.set_page_config(
@@ -24,6 +25,31 @@ def load_image(image_file):
         st.error(f"Fehler beim Laden des Bildes: {str(e)}")
         return None
 
+# Funktion zum Einbetten von Google Drive Videos
+def embed_google_drive_video(video_url):
+    """
+    Konvertiert einen Google Drive Video-Link in einen einbettbaren iframe.
+    
+    Args:
+        video_url (str): Der Google Drive Link zum Video
+        
+    Returns:
+        str: HTML iframe Code zum Einbetten des Videos
+    """
+    # Extrahiere die Video-ID aus dem Google Drive Link
+    file_id = None
+    if 'drive.google.com/file/d/' in video_url:
+        file_id = video_url.split('/file/d/')[1].split('/')[0]
+    elif 'drive.google.com/open?id=' in video_url:
+        file_id = video_url.split('id=')[1]
+    
+    if file_id:
+        embed_url = f'https://drive.google.com/file/d/{file_id}/preview'
+        return f'<iframe src="{embed_url}" width="100%" height="480" allow="autoplay"></iframe>'
+    else:
+        st.error("Ungültiger Google Drive Link")
+        return None
+
 # Sidebar für Navigation
 st.sidebar.title("Shot-Plotter Anleitung")
 page = st.sidebar.radio(
@@ -43,6 +69,18 @@ if page == "How to start":
     st.write("""
     Hier erfährst du, wie du den Shot-Plotter mit Docker Desktop starten und einrichten kannst.
     """)
+    
+    # Beispiel für ein Video-Tutorial
+    st.header("Video-Tutorial")
+    st.write("""
+    Hier ist ein Video-Tutorial, das dir zeigt, wie du den Shot-Plotter einrichtest:
+    """)
+    
+    # Google Drive Video einbetten
+    video_url = "https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
+    video_html = embed_google_drive_video(video_url)
+    if video_html:
+        st.components.v1.html(video_html, height=480)
     
     # Funktion zum Anzeigen von Bildern mit Beschreibung
     def show_step(step_number, title, description_before, description_after):
@@ -100,13 +138,14 @@ if page == "How to start":
         "Das richtige Image auswählen", 
         """
         Auf der Projektseite findest du verschiedene **Versionen** des Programms:
-        """,
-        """
-        Oben rechts findest du unter **Tag** die Versionen des Programms, wähle **v1.2** aus
+
+        Oben rechts findest du unter **Tag** die Versionen des Programms, wähle **v1.2** aus.
 
         Klicke auf anschließend auf **Pull**
         
         *Hinweis: Der Download kann je nach Internetverbindung einige Minuten dauern.*
+        """,
+        """
         """
     )
     
@@ -172,6 +211,7 @@ if page == "How to start":
         Der Container sollte nun gestartet worden sein. 
 
         Klicke nun auf den angezeigten Port. Im Bild ist dieser mit rot umrandet. 
+
         *Hinweis: Im Bild ist 7001 der Port, bei dir sollte aber 8080 angezeigt werden, sofern du die Standard-Einstellungen verwendet hast.*
 
         Du solltest nun die Seite des Shot-Plotters sehen.
@@ -185,30 +225,18 @@ if page == "How to start":
         9,
         "Shot-Plotter im Browser öffnen",
         """
-        Du kannst die Seite des Shot-Plotters immer wieder unter http://localhost:8080 in deinem Browser aufrufen.
+        Du kannst die Seite des Shot-Plotters immer wieder unter http://localhost:8080 in deinem Browser aufrufen. (Sofern du die Standard-Einstellungen verwendet hast)
+
         *Hinweis: Safari und Firefox sind als Browser zu empfehlen, bei Chrome kann es zu Problemen kommen.*
 
         Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden, wie auf dem Bild zu sehen.
         Gehe dazu in Docker Desktop auf **"Containers"**. Dort müsste der Shot-Plotter unter **"shot-plotter"** zu sehen sein. Wenn du unter Port auf die Nummer klickst, öffnet sich der Shot-Plotter in deinem Browser.
+
         *Hinweis: Der Punkt neben dem Namen des Containers sollte grün sein, wenn der Container gestartet ist. Ist dieser nicht ausgefüllt und grau, musst du die Schritte nochmal wiederholen.*
         """,
         """
         """
     )
-
-    # Alternative Installations-Methode über Kommandozeile
-    st.header("Alternative: Installation über Kommandozeile")
-    with st.expander("Für fortgeschrittene Benutzer"):
-        st.markdown("""
-        Der Shot-Plotter kann auch über die Kommandozeile gestartet werden:
-        
-        ```bash
-        docker pull sindi98/shot-plotter-shot-plotter:v1.2
-        docker run -d -p 8080:8080 --name shot-plotter sindi98/shot-plotter-shot-plotter:v1.2
-        ```
-        
-        Nach der Installation kannst du den Shot-Plotter unter http://localhost:8080 aufrufen.
-        """)
 
 # Beispielablauf
 elif page == "Beispielablauf":
