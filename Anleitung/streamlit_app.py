@@ -191,6 +191,8 @@ if page == "How to start":
         Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden, wie auf dem Bild zu sehen.
         Gehe dazu in Docker Desktop auf **"Containers"**. Dort müsste der Shot-Plotter unter **"shot-plotter"** zu sehen sein. Wenn du unter Port auf die Nummer klickst, öffnet sich der Shot-Plotter in deinem Browser.
         *Hinweis: Der Punkt neben dem Namen des Containers sollte grün sein, wenn der Container gestartet ist. Ist dieser nicht ausgefüllt und grau, musst du die Schritte nochmal wiederholen.*
+        """,
+        """
         """
     )
 
