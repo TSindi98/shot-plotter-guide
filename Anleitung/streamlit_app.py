@@ -44,9 +44,9 @@ def embed_google_drive_video(video_url):
         file_id = video_url.split('id=')[1]
     
     if file_id:
-        # Verwende die direkte Vorschau-URL mit höherer Qualität und zusätzlichen Parametern
-        embed_url = f'https://drive.google.com/file/d/{file_id}/preview?autoplay=0&hd=1&modestbranding=1&rel=0&showinfo=0&controls=1&fs=1'
-        return f'<iframe src="{embed_url}" width="100%" height="1080" allow="autoplay" style="border: none; max-width: 1920px; margin: 0 auto;"></iframe>'
+        # Verwende die direkte Vorschau-URL mit Fokus auf Vollbildmodus
+        embed_url = f'https://drive.google.com/file/d/{file_id}/preview?autoplay=0&fs=1'
+        return f'<iframe src="{embed_url}" width="100%" height="720" allow="autoplay; fullscreen" style="border: none;"></iframe>'
     else:
         st.error("Invalid Google Drive Link")
         return None
@@ -70,9 +70,9 @@ def embed_youtube_video(video_url):
         video_id = video_url.split('youtu.be/')[1].split('?')[0]
     
     if video_id:
-        # Füge Parameter für maximale Qualität und bessere Darstellung hinzu
-        embed_url = f'https://www.youtube.com/embed/{video_id}?hd=1&vq=hd1080&modestbranding=1&rel=0&showinfo=0&controls=1&fs=1'
-        return f'<iframe src="{embed_url}" width="100%" height="1080" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border: none; max-width: 1920px; margin: 0 auto;"></iframe>'
+        # Fokus auf Vollbildmodus und Qualität
+        embed_url = f'https://www.youtube.com/embed/{video_id}?fs=1&hd=1'
+        return f'<iframe src="{embed_url}" width="100%" height="720" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen style="border: none;"></iframe>'
     else:
         st.error("Invalid YouTube Link")
         return None
