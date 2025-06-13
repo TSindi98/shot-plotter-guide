@@ -21,15 +21,13 @@ services:
 
   streamlit-guide:
     build:
-      context: .
-      dockerfile: Dockerfile.streamlit
-    image: sindi98/shot-plotter-guide:latest
-    container_name: shot-plotter-guide
+      context: ./Anleitung
+      dockerfile: Dockerfile
+    container_name: streamlit-guide
     ports:
       - "8501:8501"
     volumes:
-      - ./videos:/app/videos
-      - ./images:/app/images
+      - ./Anleitung:/app
     restart: unless-stopped
     networks:
       - shot-plotter-network

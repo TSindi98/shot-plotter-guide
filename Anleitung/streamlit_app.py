@@ -37,8 +37,11 @@ if page == "How to start":
     """)
     
     # Funktion zum Anzeigen von Bildern mit Beschreibung
-    def show_step(step_number, title, description):
+    def show_step(step_number, title, description_before, description_after):
         st.header(f"Schritt {step_number}: {title}")
+        
+        # Beschreibung vor dem Bild
+        st.markdown(description_before)
         
         # Bild anzeigen
         image_path = f"images/{step_number}.png"
@@ -47,8 +50,8 @@ if page == "How to start":
         else:
             st.error(f"Bild '{image_path}' nicht gefunden")
         
-        # Beschreibung unter dem Bild
-        st.markdown(description)
+        # Beschreibung nach dem Bild
+        st.markdown(description_after)
         st.markdown("---")  # Trennlinie
     
     # Schritt 1
@@ -56,11 +59,16 @@ if page == "How to start":
         1, 
         "Docker Desktop öffnen", 
         """
-        Öffne Docker Desktop auf deinem Computer. Falls noch nicht installiert, kannst du es hier herunterladen:
+        Falls du **Docker Desktop** noch nicht installiert hast, kannst du es hier herunterladen:
         
         [Docker Desktop herunterladen](https://www.docker.com/products/docker-desktop/)
-        
-        Klicke links auf DockerHub und suche nach sindi98
+
+        (Achte darauf, dass du die richtige Version für dein Betriebssystem herunterlädst)
+
+        Erstelle dir einen Account bei Docker falls du noch keinen hast und melde dich damit bei Docker Desktop an.
+        """,
+        """
+        Klicke links auf **DockerHub** und suche nach **sindi98**
         """
     )
     
@@ -69,7 +77,12 @@ if page == "How to start":
         2, 
         "Nach dem Shot-Plotter suchen", 
         """
-        Klicke auf das Projekt ganz links es heißt sindi98/shot-plotter-shot-plotter
+        In der Suchergebnisliste findest du verschiedene Projekte:
+
+        Klicke auf das Projekt **sindi98/shot-plotter-shot-plotter**. (Der Name ist nicht ganz zu sehen, aber man kann erkennen um welches Projekt es sich handelt)
+        """,
+        """
+        
         """
     )
     
@@ -78,9 +91,12 @@ if page == "How to start":
         3, 
         "Das richtige Image auswählen", 
         """
-        Oben rechts findest du unter Tag die Versionen des Programms, wähle v1.2 aus
+        Auf der Projektseite findest du verschiedene **Versionen** des Programms:
+        """,
+        """
+        Oben rechts findest du unter **Tag** die Versionen des Programms, wähle **v1.2** aus
 
-        Klicke auf anschließend auf Pull
+        Klicke auf anschließend auf **Pull**
         
         *Hinweis: Der Download kann je nach Internetverbindung einige Minuten dauern.*
         """
@@ -89,24 +105,80 @@ if page == "How to start":
     # Schritt 4
     show_step(
         4, 
-        "Container konfigurieren", 
+        "Zur Image-Seite wechseln", 
         """
-        Klicke nun in der linken Seitenleiste auf Images
+        Nach dem erfolgreichen Download des Images:
+
+        Klicke nun in der linken Seitenleiste auf **Images**
+        """,
+        """
+        
         """
     )
     
     # Schritt 5
     show_step(
         5, 
-        "Shot-Plotter im Browser öffnen", 
+        "Container konfigurieren", 
         """
-        1. Öffne deinen Browser und gehe zu http://localhost:8080
-        2. Wähle "Soccer-NCAA" als Sportart aus
-        3. Du siehst ein Fußballfeld und eine Seitenleiste mit verschiedenen Einstellungsmöglichkeiten
-        4. Jetzt kannst du beginnen, Daten zu erfassen
+        Du solltest nun ein Image mit dem Namen **sindi98/shot-plotter-shot-plotter** sehen. Außerdem sollte der Tag **v1.2** angezeigt werden.
+
+        Klicke nun auf den blauen Button **Run** (Hier auf dem Bild in grün markiert)
+        """,
+        """
+        *Hinweis: neben dem Namen shot-plotter-shot-plotter ist ein kleiner Kreis der noch nicht ausgefüllt ist. Im späteren Verlauf sollte dieser grün sein.*
         """
     )
-    
+
+    # Schritt 6
+    show_step(
+        6, 
+        "Container Einstellungen", 
+        """
+        Öffne **"Optional Settings"** indem du auf den weißen Pfeil klickst.
+        """,
+        """
+        """
+    )
+
+    # Schritt 7
+    show_step(
+        7, 
+        "Container starten", 
+        """
+        Setze einen Namen für den Container. Vorzugsweise nenne ihn **shot-plotter**.
+
+        Wähle **8080:8080** als Port aus, indem du in das Eingabefeld **8080** eingibst.
+
+        Klicke auf **Run**
+        """,
+        """
+        """
+    )
+
+    # Schritt 8
+    show_step(
+        8, 
+        "Shot-Plotter im Browser öffnen", 
+         """
+        Der Container sollte nun gestartet worden sein. 
+
+        Klicke nun auf den angezeigten Port. Im Bild ist dieser mit rot umrandet. 
+        *Hinweis: Im Bild ist 7001 der Port, bei dir sollte aber 8080 angezeigt werden, sofern du die Standard-Einstellungen verwendet hast.*
+
+        Du solltest nun die Seite des Shot-Plotters sehen.
+        """,
+        """
+        Du kannst die Seite des Shot-Plotters immer wieder unter http://localhost:8080 in deinem Browser aufrufen.
+        *Hinweis: Safari und Firefox sind als Browser zu empfehlen, bei Chrome kann es zu Problemen kommen.*
+
+        Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden.
+        """
+    )
+
+
+
+
     # Alternative Installations-Methode über Kommandozeile
     st.header("Alternative: Installation über Kommandozeile")
     with st.expander("Für fortgeschrittene Benutzer"):
