@@ -44,8 +44,9 @@ def embed_google_drive_video(video_url):
         file_id = video_url.split('id=')[1]
     
     if file_id:
-        embed_url = f'https://drive.google.com/file/d/{file_id}/preview'
-        return f'<iframe src="{embed_url}" width="100%" height="480" allow="autoplay"></iframe>'
+        # Verwende die direkte Vorschau-URL mit höherer Qualität
+        embed_url = f'https://drive.google.com/file/d/{file_id}/preview?autoplay=0&hd=1'
+        return f'<iframe src="{embed_url}" width="100%" height="720" allow="autoplay" style="border: none;"></iframe>'
     else:
         st.error("Ungültiger Google Drive Link")
         return None
@@ -246,14 +247,22 @@ elif page == "Beispielablauf":
     def show_workflow_step(step_number, title, description):
         st.header(f"Schritt {step_number}: {title}")
         
-        # Bild anzeigen
-        image_path = f"images/workflow_{step_number}.png"
-        if os.path.exists(image_path):
-            st.image(image_path, use_container_width=True)
+        # Spezialbehandlung für Schritt 1 mit Video
+        if step_number == 1:
+            # Video einbetten
+            video_url = "https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
+            video_html = embed_google_drive_video(video_url)
+            if video_html:
+                st.components.v1.html(video_html, height=720)
         else:
-            st.error(f"Bild '{image_path}' nicht gefunden")
+            # Bild anzeigen
+            image_path = f"images/workflow_{step_number}.png"
+            if os.path.exists(image_path):
+                st.image(image_path, use_container_width=True)
+            else:
+                st.error(f"Bild '{image_path}' nicht gefunden")
         
-        # Beschreibung unter dem Bild
+        # Beschreibung unter dem Video/Bild
         st.markdown(description)
         st.markdown("---")  # Trennlinie
     
@@ -262,6 +271,8 @@ elif page == "Beispielablauf":
         1, 
         "Aktion platzieren", 
         """
+        In diesem Video wird gezeigt, wie du eine Aktion auf dem Spielfeld platzierst:
+
         1. Klicke auf das Spielfeld, um den Startpunkt einer Aktion zu markieren
         2. Halte die Shift-Taste gedrückt und klicke erneut, um den Endpunkt zu setzen (für Pass, Schuss, etc.)
         """
