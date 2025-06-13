@@ -104,7 +104,7 @@ st.set_page_config(
 st.sidebar.title("Shot-Plotter Guide")
 page = st.sidebar.radio(
     "Navigation",
-    ["How to start", "Example Workflow", "Widget Explanation", "Extras", "Download"]
+    ["How to start", "Example Workflow", "Widget Explanation", "Download"]
 )
 
 # Funktion zum Einbetten lokaler Videos
@@ -283,7 +283,7 @@ elif page == "Example Workflow":
     # Allgemeines Setup
     show_workflow_step(
         1, 
-        "Allgemeines Setup", 
+        "General Setup", 
         """
         In this section, you'll learn how to set up and configure the Shot-Plotter for your analysis:
 
@@ -298,7 +298,7 @@ elif page == "Example Workflow":
     # Location und Timing des Passes
     show_workflow_step(
         2, 
-        "Location und Timing des Passes", 
+        "Location und Timing of passes", 
         """
         Learn how to accurately record pass locations and timing:
 
@@ -352,13 +352,10 @@ elif page == "Widget Explanation":
     # Aktionstyp
     show_workflow_step(
         3,
-        "Aktionstyp",
+        "Action Type",
         """
-        Detailed explanation of different action types:
+        Explanation of different action types
 
-        1. Pass types and variations
-        2. Shot types and techniques
-        3. Other action types (dribbling, headers, duels)
         """,
         video_url="https://drive.google.com/file/d/14KoviY4fIZHljKfGwbB6grmx4p4b0GH_/view?usp=drive_link",
         video_type="drive"
@@ -371,9 +368,8 @@ elif page == "Widget Explanation":
         """
         How to record pass heights accurately:
 
-        1. Flat passes
-        2. High passes
-        3. Above knee height passes
+        1. Define the pass height
+        2. Explain the different pass heights
         """,
         video_url="https://drive.google.com/file/d/1YqhLkeUpoepsXrN75hPQv0_KpOQB_H5O/view?usp=drive_link",
         video_type="drive"
