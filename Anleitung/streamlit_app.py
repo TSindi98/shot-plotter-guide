@@ -4,13 +4,6 @@ import os
 from PIL import Image
 import re
 
-# Konfiguration der Seite
-st.set_page_config(
-    page_title="Shot-Plotter Guide",
-    page_icon="🎯",
-    layout="wide"
-)
-
 # Hilfsfunktion zum Laden von Bildern
 def load_image(image_file):
     try:
@@ -76,6 +69,36 @@ def embed_youtube_video(video_url):
     else:
         st.error("Invalid YouTube Link")
         return None
+
+# Funktion zum Anzeigen von Workflow-Schritten mit Videos
+def show_workflow_step(step_number, title, description, video_url=None, video_type=None):
+    """
+    Zeigt einen Workflow-Schritt mit optionalem Video an.
+    
+    Args:
+        step_number (int): Die Nummer des Schritts
+        title (str): Der Titel des Schritts
+        description (str): Die Beschreibung des Schritts
+        video_url (str, optional): URL zum Video
+        video_type (str, optional): Typ des Videos ('drive' oder 'youtube')
+    """
+    st.header(f"{step_number}. {title}")
+    st.markdown(description)
+    
+    if video_url and video_type:
+        if video_type == "drive":
+            st.components.v1.html(embed_google_drive_video(video_url), height=720)
+        elif video_type == "youtube":
+            st.components.v1.html(embed_youtube_video(video_url), height=720)
+    
+    st.markdown("---")  # Trennlinie
+
+# Konfiguration der Seite
+st.set_page_config(
+    page_title="Shot-Plotter Guide",
+    page_icon="🎯",
+    layout="wide"
+)
 
 # Sidebar für Navigation
 st.sidebar.title("Shot-Plotter Guide")
