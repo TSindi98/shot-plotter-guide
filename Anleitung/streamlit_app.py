@@ -46,7 +46,7 @@ def embed_google_drive_video(video_url):
     if file_id:
         # Verwende die direkte Vorschau-URL mit höherer Qualität
         embed_url = f'https://drive.google.com/file/d/{file_id}/preview?autoplay=0&hd=1'
-        return f'<iframe src="{embed_url}" width="100%" height="1080" allow="autoplay" style="border: none;"></iframe>'
+        return f'<iframe src="{embed_url}" width="100%" height="720" allow="autoplay" style="border: none;"></iframe>'
     else:
         st.error("Ungültiger Google Drive Link")
         return None
@@ -71,17 +71,6 @@ if page == "How to start":
     Hier erfährst du, wie du den Shot-Plotter mit Docker Desktop starten und einrichten kannst.
     """)
     
-    # Beispiel für ein Video-Tutorial
-    st.header("Video-Tutorial")
-    st.write("""
-    Hier ist ein Video-Tutorial, das dir zeigt, wie du den Shot-Plotter einrichtest:
-    """)
-    
-    # Google Drive Video einbetten
-    video_url = "https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
-    video_html = embed_google_drive_video(video_url)
-    if video_html:
-        st.components.v1.html(video_html, height=480)
     
     # Funktion zum Anzeigen von Bildern mit Beschreibung
     def show_step(step_number, title, description_before, description_after):
@@ -244,18 +233,16 @@ elif page == "Beispielablauf":
     st.title("Beispielablauf")
     
     # Funktion zum Anzeigen von Bildern mit Beschreibung für den Beispielablauf
-    def show_workflow_step(step_number, title, description):
-        st.header(f"Schritt {step_number}: {title}")
+    def show_workflow_step(step_number, title, description, video_url=None):
+        st.header(f"{title}")
         
-        # Spezialbehandlung für Schritt 1 mit Video
-        if step_number == 1:
-            # Video einbetten
-            video_url = "https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
+        # Video anzeigen, falls ein Link vorhanden ist
+        if video_url:
             video_html = embed_google_drive_video(video_url)
             if video_html:
                 st.components.v1.html(video_html, height=720)
         else:
-            # Bild anzeigen
+            # Bild anzeigen, wenn kein Video vorhanden ist
             image_path = f"images/workflow_{step_number}.png"
             if os.path.exists(image_path):
                 st.image(image_path, use_container_width=True)
@@ -275,7 +262,8 @@ elif page == "Beispielablauf":
 
         1. Klicke auf das Spielfeld, um den Startpunkt einer Aktion zu markieren
         2. Halte die Shift-Taste gedrückt und klicke erneut, um den Endpunkt zu setzen (für Pass, Schuss, etc.)
-        """
+        """,
+        video_url="https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
     )
     
     # Schritt 2 des Workflows
@@ -292,7 +280,9 @@ elif page == "Beispielablauf":
         5. **Situation**: Aus dem Spiel, Anstoß, Abstoß, Ecke oder Freistoß
         6. **Zeit**: Spielzeit in Minuten:Sekunden
         7. **Aktionstyp**: Pass, Schuss, Dribbling, Kopfball oder Zweikampf
-        """
+        """,
+        # Hier können Sie den Video-Link für Schritt 2 einfügen
+        # video_url="HIER_VIDEO_LINK_FÜR_SCHRITT_2"
     )
     
     # Schritt 3 des Workflows
