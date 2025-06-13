@@ -257,75 +257,34 @@ if page == "How to start":
 elif page == "Example Workflow":
     st.title("Example Workflow")
     
-    # Funktion zum Anzeigen von Bildern mit Beschreibung für den Beispielablauf
-    def show_workflow_step(step_number, title, description, video_url=None, video_type="drive"):
-        st.header(f"{title}")
-        
-        # Video anzeigen, falls ein Link vorhanden ist
-        if video_url:
-            if video_type == "youtube":
-                video_html = embed_youtube_video(video_url)
-            else:  # default to drive
-                video_html = embed_google_drive_video(video_url)
-            if video_html:
-                st.components.v1.html(video_html, height=1080)
-        else:
-            # Bild anzeigen, wenn kein Video vorhanden ist
-            image_path = f"images/workflow_{step_number}.png"
-            if os.path.exists(image_path):
-                st.image(image_path, use_container_width=True)
-            else:
-                st.error(f"Image '{image_path}' not found")
-        
-        # Beschreibung unter dem Video/Bild
-        st.markdown(description)
-        st.markdown("---")  # Trennlinie
-    
-    # Schritt 1 des Workflows
+    # Allgemeines Setup
     show_workflow_step(
         1, 
-        "Place Action", 
+        "Allgemeines Setup", 
         """
-        This video shows how to place an action on the field:
+        In this section, you'll learn how to set up and configure the Shot-Plotter for your analysis:
 
-        1. Click on the field to mark the starting point of an action
-        2. Hold the Shift key and click again to set the end point (for pass, shot, etc.)
+        1. Basic configuration settings
+        2. Field setup and customization
+        3. Initial settings for your analysis
         """,
-        video_url="https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
+        video_url="https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=drive_link",
+        video_type="drive"
     )
     
-    # Schritt 2 des Workflows
+    # Location und Timing des Passes
     show_workflow_step(
         2, 
-        "Enter Details", 
+        "Location und Timing des Passes", 
         """
-        In the side panel, you can enter the following information:
-        
-        1. **Half**: 1st or 2nd half
-        2. **Opponent Pressure**: Strength of opponent pressure (0-4)
-        3. **Outcome**: Successful or Not Successful
-        4. **Pass Height**: Flat, High, or Above Knee Height
-        5. **Situation**: From Play, Kick-off, Goal Kick, Corner, or Free Kick
-        6. **Time**: Game time in minutes:seconds
-        7. **Action Type**: Pass, Shot, Dribbling, Header, or Duel
-        """,
-        # Here you can add the video link for step 2
-        # video_url="YOUR_VIDEO_LINK_FOR_STEP_2"
-    )
+        Learn how to accurately record pass locations and timing:
 
-    # Schritt 3 des Workflows
-    show_workflow_step(
-        3,
-        "Advanced Features",
-        """
-        This video demonstrates some advanced features of the Shot-Plotter:
-
-        1. How to use filters to analyze specific situations
-        2. How to export your data for further analysis
-        3. Tips and tricks for efficient data collection
+        1. How to mark pass starting and ending points
+        2. Recording the exact timing of passes
+        3. Tips for precise location marking
         """,
-        video_url="https://youtu.be/boyOUWLbDII",
-        video_type="youtube"
+        video_url="https://drive.google.com/file/d/1qwz1p9AZaLtSpx7_jyE3gf14O_88tltE/view?usp=drive_link",
+        video_type="drive"
     )
 
 # Widget Explanation
@@ -334,9 +293,85 @@ elif page == "Widget Explanation":
     
     st.markdown("""
     The widgets in Shot-Plotter enable detailed recording of game situations.
-    Here is an explanation of all available widgets:
+    Here is an explanation of all available widgets with video tutorials:
     """)
     
+    # Gegnerdruck
+    show_workflow_step(
+        1,
+        "Gegnerdruck",
+        """
+        Learn how to assess and record opponent pressure:
+
+        1. Understanding pressure levels (0-4)
+        2. How to evaluate pressure situations
+        3. Tips for consistent pressure assessment
+        """,
+        video_url="https://drive.google.com/file/d/1LoD-_ej1sxA3JzCmbZqudO5s7kar8Vqi/view?usp=drive_link",
+        video_type="drive"
+    )
+    
+    # Outcome
+    show_workflow_step(
+        2,
+        "Outcome",
+        """
+        Understanding how to record action outcomes:
+
+        1. Defining successful vs. unsuccessful actions
+        2. Criteria for outcome assessment
+        3. Examples of different outcomes
+        """,
+        video_url="https://drive.google.com/file/d/1UYiFCwREcc1iTMeGpAn5ydRKuyEnyDGH/view?usp=drive_link",
+        video_type="drive"
+    )
+    
+    # Aktionstyp
+    show_workflow_step(
+        3,
+        "Aktionstyp",
+        """
+        Detailed explanation of different action types:
+
+        1. Pass types and variations
+        2. Shot types and techniques
+        3. Other action types (dribbling, headers, duels)
+        """,
+        video_url="https://drive.google.com/file/d/14KoviY4fIZHljKfGwbB6grmx4p4b0GH_/view?usp=drive_link",
+        video_type="drive"
+    )
+    
+    # Passhöhe
+    show_workflow_step(
+        4,
+        "Passhöhe",
+        """
+        How to record pass heights accurately:
+
+        1. Flat passes
+        2. High passes
+        3. Above knee height passes
+        """,
+        video_url="https://drive.google.com/file/d/1YqhLkeUpoepsXrN75hPQv0_KpOQB_H5O/view?usp=drive_link",
+        video_type="drive"
+    )
+    
+    # Feldgröße
+    show_workflow_step(
+        5,
+        "Feldgröße",
+        """
+        Understanding field size settings and their impact:
+
+        1. How to set up field dimensions
+        2. Impact on analysis
+        3. Best practices for different field sizes
+        """,
+        video_url="https://drive.google.com/file/d/1xuEg--KBDVLgLU65oevoi6hNp5dP0I1n/view?usp=drive_link",
+        video_type="drive"
+    )
+    
+    # Rest of the widget explanations
     widgets = [
         {
             "name": "Half",
@@ -348,25 +383,7 @@ elif page == "Widget Explanation":
             "name": "Team",
             "type": "Radio Button",
             "options": ["BVB", "Opponent"],
-            "description": "Indicates which team executed the action."
-        },
-        {
-            "name": "Opponent Pressure",
-            "type": "Radio Button",
-            "options": ["0", "1", "2", "3", "4"],
-            "description": "Indicates the intensity of opponent pressure. 0 = no pressure, 4 = maximum pressure."
-        },
-        {
-            "name": "Outcome",
-            "type": "Radio Button",
-            "options": ["Successful", "Not Successful"],
-            "description": "Indicates whether the action was successful or not."
-        },
-        {
-            "name": "Pass Height",
-            "type": "Radio Button",
-            "options": ["Flat", "High", "Above Knee Height"],
-            "description": "Indicates the height of the pass."
+            "description": "Indicates which team executed the action. You only tag passes from BVB so you can only select BVB."
         },
         {
             "name": "Situation",
@@ -378,12 +395,6 @@ elif page == "Widget Explanation":
             "name": "Time",
             "type": "Text",
             "description": "Allows entering the game time in mm:ss format."
-        },
-        {
-            "name": "Action Type",
-            "type": "Dropdown",
-            "options": ["Pass", "Shot", "Dribbling", "Header", "Duel"],
-            "description": "Indicates the type of action."
         }
     ]
     
@@ -396,144 +407,64 @@ elif page == "Widget Explanation":
                     st.markdown(f"- {option}")
 
 # Extras
-elif page == "Extras":
-    st.title("Extras")
-    
-    st.header("Customizing Widgets")
-    st.markdown("""
-    You can customize the available widgets and their options:
-    
-    1. Open settings via the gear icon
-    2. Click on "Create New Detail" to add a new widget
-    3. Choose the widget type (Radio Button, Dropdown, Text, etc.)
-    4. Enter a title and available options
-    5. Save the changes
-    
-    The changes will be saved in the supported-sports.json file.
-    """)
-    
-    st.header("Data Merging")
-    st.markdown("""
-    With the data merging tool, you can combine data from Shot-Plotter with other data sources:
-    
-    1. Export the data from Shot-Plotter as CSV
-    2. Open the data merging tool (available at http://localhost:8000)
-    3. Import the CSV file and the data to be linked
-    4. Perform the linking and export the result
-    """)
-    
-    st.header("Tips and Tricks")
-    st.markdown("""
-    ### Keyboard Shortcuts
-    
-    - **Shift + Click**: Two-point action (e.g., pass from A to B)
-    - **ESC**: Cancel current action
-    
-    ### Troubleshooting
-    
-    - **Clear Browser Cache**: For display issues
-    - **Restart Docker Container**: For general issues
-    
-    ```bash
-    docker restart shot-plotter
-    ```
-    """)
+# elif page == "Extras":
+#     st.title("Extras")
+#     
+#     st.header("Customizing Widgets")
+#     st.markdown("""
+#     You can customize the available widgets and their options:
+#     
+#     1. Open settings via the gear icon
+#     2. Click on "Create New Detail" to add a new widget
+#     3. Choose the widget type (Radio Button, Dropdown, Text, etc.)
+#     4. Enter a title and available options
+#     5. Save the changes
+#     
+#     The changes will be saved in the supported-sports.json file.
+#     """)
+#     
+#     st.header("Data Merging")
+#     st.markdown("""
+#     With the data merging tool, you can combine data from Shot-Plotter with other data sources:
+#     
+#     1. Export the data from Shot-Plotter as CSV
+#     2. Open the data merging tool (available at http://localhost:8000)
+#     3. Import the CSV file and the data to be linked
+#     4. Perform the linking and export the result
+#     """)
+#     
+#     st.header("Tips and Tricks")
+#     st.markdown("""
+#     ### Keyboard Shortcuts
+#     
+#     - **Shift + Click**: Two-point action (e.g., pass from A to B)
+#     - **ESC**: Cancel current action
+#     
+#     ### Troubleshooting
+#     
+#     - **Clear Browser Cache**: For display issues
+#     - **Restart Docker Container**: For general issues
+#     
+#     ```bash
+#     docker restart shot-plotter
+#     ```
+#     """)
 
 # Download
 elif page == "Download":
     st.title("Download")
     
-    st.header("Shot-Plotter via Docker Desktop")
-    st.markdown("""
-    The easiest way to install Shot-Plotter is via Docker Desktop:
+    # Shot-Plotter Installation
+    show_workflow_step(
+        1,
+        "Data Download",
+        """
+        Click on the download Button below the Video. Name it like the name of the current video.
+        """,
+        video_url="https://drive.google.com/file/d/1fzYCkfbXEC-RmbX8mO-F1JuAzLdn60nu/view?usp=drive_link",
+        video_type="drive"
+    )
     
-    1. Open Docker Desktop
-    2. Click on the "Images" tab
-    3. Click on "Pull" or "Search on Docker Hub"
-    4. Search for `sindi98/shot-plotter-shot-plotter`
-    5. Select tag `v1.2` and click on "Pull"
-    
-    You can find a detailed guide with screenshots in the "How to start" section.
-    """)
-    
-    st.header("System Requirements")
-    st.markdown("""
-    For Shot-Plotter you need:
-    
-    - Docker Desktop installed
-    - Min. 2 GB RAM
-    - Min. 1 GB free storage space
-    - Internet connection for initial download
-    """)
-    
-    st.header("Download Data Merging Tool")
-    st.markdown("""
-    The data merging tool is also available via Docker Hub:
-    
-    1. Open Docker Desktop
-    2. Click on the "Images" tab
-    3. Click on "Pull" or "Search on Docker Hub"
-    4. Search for `sindi98/shot-plotter-data-merging`
-    5. Select the latest tag and click on "Pull"
-    6. Start the tool with port 8000
-    """)
-    
-    st.header("Complete System with Docker Compose")
-    with st.expander("For advanced users"):
-        st.markdown("""
-        You can also start all components simultaneously with Docker Compose.
-        Create a file named `docker-compose.yml` with the following content:
-        
-        ```yaml
-        version: '3'
-        
-        services:
-          shot-plotter:
-            image: sindi98/shot-plotter-shot-plotter:v1.2
-            container_name: shot-plotter
-            ports:
-              - "8080:8080"
-            restart: unless-stopped
-            networks:
-              - shot-plotter-network
-        
-          data-merging:
-            image: sindi98/shot-plotter-data-merging:latest
-            container_name: data-merging
-            ports:
-              - "8000:8000"
-            restart: unless-stopped
-            networks:
-              - shot-plotter-network
-        
-          streamlit-guide:
-            image: sindi98/shot-plotter-guide:latest
-            container_name: shot-plotter-guide
-            ports:
-              - "8501:8501"
-            restart: unless-stopped
-            networks:
-              - shot-plotter-network
-        
-        networks:
-          shot-plotter-network:
-            driver: bridge
-        ```
-        
-        Start the system with:
-        
-        ```bash
-        docker-compose up -d
-        ```
-        """)
-    
-    st.header("Sample Data")
-    st.markdown("""
-    Here you can download sample data to test Shot-Plotter:
-    
-    - [Sample CSV for Shot-Plotter](#) (Link will be added later)
-    - [Sample dataset for data merging](#) (Link will be added later)
-    """)
 
 # Footer
 st.markdown("---")
