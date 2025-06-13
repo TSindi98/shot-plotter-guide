@@ -1,9 +1,9 @@
 [build-system]
-requires = ["setuptools>=68.0.0", "wheel"]
+requires = ["setuptools>=69.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "shot-plotter-guide"
 version = "1.0.0"
 description = "Anleitung für den Shot-Plotter"
-requires-python = ">=3.9,<3.13" 
+requires-python = ">=3.9" 
