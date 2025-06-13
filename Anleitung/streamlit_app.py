@@ -267,7 +267,7 @@ elif page == "Example Workflow":
             else:  # default to drive
                 video_html = embed_google_drive_video(video_url)
             if video_html:
-                st.components.v1.html(video_html, height=480)
+                st.components.v1.html(video_html, height=1080)
         else:
             # Bild anzeigen, wenn kein Video vorhanden ist
             image_path = f"images/workflow_{step_number}.png"
