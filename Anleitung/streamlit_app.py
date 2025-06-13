@@ -3,18 +3,26 @@ import base64
 import os
 from PIL import Image
 
-# Seitenkonfiguration
+# Konfiguration der Seite
 st.set_page_config(
-    page_title="Shot-Plotter & Datenmerging Anleitung",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Shot-Plotter Anleitung",
+    page_icon="🎯",
+    layout="wide"
 )
 
-# Funktion zum Laden von Bildern
+# Hilfsfunktion zum Laden von Bildern
 def load_image(image_file):
-    img = Image.open(image_file)
-    return img
+    try:
+        # Versuche das Bild aus dem images Verzeichnis zu laden
+        image_path = os.path.join("images", image_file)
+        if os.path.exists(image_path):
+            return Image.open(image_path)
+        else:
+            st.warning(f"Bild nicht gefunden: {image_path}")
+            return None
+    except Exception as e:
+        st.error(f"Fehler beim Laden des Bildes: {str(e)}")
+        return None
 
 # Sidebar für Navigation
 st.sidebar.title("Shot-Plotter Anleitung")
@@ -175,9 +183,6 @@ if page == "How to start":
         Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden.
         """
     )
-
-
-
 
     # Alternative Installations-Methode über Kommandozeile
     st.header("Alternative: Installation über Kommandozeile")
@@ -389,10 +394,12 @@ elif page == "Download":
     Eine detaillierte Anleitung mit Screenshots findest du im Bereich "How to start".
     """)
     
-    if os.path.exists("images/docker_hub_pull.png"):
-        st.image("images/docker_hub_pull.png", caption="Shot-Plotter über Docker Hub installieren", width=600)
-    else:
-        st.info("Bild 'docker_hub_pull.png' wird hier eingefügt")
+    st.markdown("""
+    ### Shot-Plotter über Docker Desktop
+    """)
+    docker_hub_pull = load_image("7.png")
+    if docker_hub_pull:
+        st.image(docker_hub_pull, caption="Docker Hub Pull", use_column_width=True)
     
     st.header("Systemanforderungen")
     st.markdown("""
