@@ -6,7 +6,7 @@ import re
 
 # Konfiguration der Seite
 st.set_page_config(
-    page_title="Shot-Plotter Anleitung",
+    page_title="Shot-Plotter Guide",
     page_icon="🎯",
     layout="wide"
 )
@@ -14,15 +14,15 @@ st.set_page_config(
 # Hilfsfunktion zum Laden von Bildern
 def load_image(image_file):
     try:
-        # Versuche das Bild aus dem Anleitung/images Verzeichnis zu laden
+        # Try to load the image from the Anleitung/images directory
         image_path = os.path.join("Anleitung", "images", image_file)
         if os.path.exists(image_path):
             return Image.open(image_path)
         else:
-            st.warning(f"Bild nicht gefunden: {image_file}")
+            st.warning(f"Image not found: {image_file}")
             return None
     except Exception as e:
-        st.error(f"Fehler beim Laden des Bildes: {str(e)}")
+        st.error(f"Error loading image: {str(e)}")
         return None
 
 # Funktion zum Einbetten von Google Drive Videos
@@ -48,14 +48,39 @@ def embed_google_drive_video(video_url):
         embed_url = f'https://drive.google.com/file/d/{file_id}/preview?autoplay=0&hd=1'
         return f'<iframe src="{embed_url}" width="100%" height="720" allow="autoplay" style="border: none;"></iframe>'
     else:
-        st.error("Ungültiger Google Drive Link")
+        st.error("Invalid Google Drive Link")
+        return None
+
+# Funktion zum Einbetten von YouTube Videos
+def embed_youtube_video(video_url):
+    """
+    Konvertiert einen YouTube Video-Link in einen einbettbaren iframe.
+    
+    Args:
+        video_url (str): Der YouTube Link zum Video
+        
+    Returns:
+        str: HTML iframe Code zum Einbetten des Videos
+    """
+    # Extrahiere die Video-ID aus dem YouTube Link
+    video_id = None
+    if 'youtube.com/watch?v=' in video_url:
+        video_id = video_url.split('watch?v=')[1].split('&')[0]
+    elif 'youtu.be/' in video_url:
+        video_id = video_url.split('youtu.be/')[1].split('?')[0]
+    
+    if video_id:
+        embed_url = f'https://www.youtube.com/embed/{video_id}'
+        return f'<iframe src="{embed_url}" width="100%" height="720" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border: none;"></iframe>'
+    else:
+        st.error("Invalid YouTube Link")
         return None
 
 # Sidebar für Navigation
-st.sidebar.title("Shot-Plotter Anleitung")
+st.sidebar.title("Shot-Plotter Guide")
 page = st.sidebar.radio(
     "Navigation",
-    ["How to start", "Beispielablauf", "Erklärung der Widgets", "Extras", "Download"]
+    ["How to start", "Example Workflow", "Widget Explanation", "Extras", "Download"]
 )
 
 # Funktion zum Einbetten lokaler Videos
@@ -68,13 +93,12 @@ def local_video(file_path):
 if page == "How to start":
     st.title("How to start")
     st.write("""
-    Hier erfährst du, wie du den Shot-Plotter mit Docker Desktop starten und einrichten kannst.
+    Here you will learn how to start and set up the Shot-Plotter using Docker Desktop.
     """)
-    
     
     # Funktion zum Anzeigen von Bildern mit Beschreibung
     def show_step(step_number, title, description_before, description_after):
-        st.header(f"Schritt {step_number}: {title}")
+        st.header(f"Step {step_number}: {title}")
         
         # Beschreibung vor dem Bild
         st.markdown(description_before)
@@ -93,29 +117,29 @@ if page == "How to start":
     # Schritt 1
     show_step(
         1, 
-        "Docker Desktop öffnen", 
+        "Open Docker Desktop", 
         """
-        Falls du **Docker Desktop** noch nicht installiert hast, kannst du es hier herunterladen:
+        If you haven't installed **Docker Desktop** yet, you can download it here:
         
-        [Docker Desktop herunterladen](https://www.docker.com/products/docker-desktop/)
+        [Download Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
-        (Achte darauf, dass du die richtige Version für dein Betriebssystem herunterlädst)
+        (Make sure to download the correct version for your operating system)
 
-        Erstelle dir einen Account bei Docker falls du noch keinen hast und melde dich damit bei Docker Desktop an.
+        Create a Docker account if you don't have one yet and sign in to Docker Desktop.
         """,
         """
-        Klicke links auf **DockerHub** und suche nach **sindi98**
+        Click on **DockerHub** on the left and search for **sindi98**
         """
     )
     
     # Schritt 2
     show_step(
         2, 
-        "Nach dem Shot-Plotter suchen", 
+        "Search for Shot-Plotter", 
         """
-        In der Suchergebnisliste findest du verschiedene Projekte:
+        In the search results list, you'll find various projects:
 
-        Klicke auf das Projekt **sindi98/shot-plotter-shot-plotter**. (Der Name ist nicht ganz zu sehen, aber man kann erkennen um welches Projekt es sich handelt)
+        Click on the project **sindi98/shot-plotter-shot-plotter**. (The name is not fully visible, but you can recognize which project it is)
         """,
         """
         
@@ -125,15 +149,15 @@ if page == "How to start":
     # Schritt 3
     show_step(
         3, 
-        "Das richtige Image auswählen", 
+        "Select the correct image", 
         """
-        Auf der Projektseite findest du verschiedene **Versionen** des Programms:
+        On the project page, you'll find different **versions** of the program:
 
-        Oben rechts findest du unter **Tag** die Versionen des Programms, wähle **v1.2** aus.
+        In the top right, under **Tag**, you'll find the program versions, select **v1.2**.
 
-        Klicke auf anschließend auf **Pull**
+        Click on **Pull** afterwards
         
-        *Hinweis: Der Download kann je nach Internetverbindung einige Minuten dauern.*
+        *Note: The download may take several minutes depending on your internet connection.*
         """,
         """
         """
@@ -142,11 +166,11 @@ if page == "How to start":
     # Schritt 4
     show_step(
         4, 
-        "Zur Image-Seite wechseln", 
+        "Switch to Images page", 
         """
-        Nach dem erfolgreichen Download des Images:
+        After successfully downloading the image:
 
-        Klicke nun in der linken Seitenleiste auf **Images**
+        Click on **Images** in the left sidebar
         """,
         """
         
@@ -156,23 +180,23 @@ if page == "How to start":
     # Schritt 5
     show_step(
         5, 
-        "Container konfigurieren", 
+        "Configure container", 
         """
-        Du solltest nun ein Image mit dem Namen **sindi98/shot-plotter-shot-plotter** sehen. Außerdem sollte der Tag **v1.2** angezeigt werden.
+        You should now see an image named **sindi98/shot-plotter-shot-plotter**. The tag **v1.2** should also be displayed.
 
-        Klicke nun auf den blauen Button **Run** (Hier auf dem Bild in grün markiert)
+        Now click on the blue **Run** button (marked in green in this image)
         """,
         """
-        *Hinweis: neben dem Namen shot-plotter-shot-plotter ist ein kleiner Kreis der noch nicht ausgefüllt ist. Im späteren Verlauf sollte dieser grün sein.*
+        *Note: Next to the name shot-plotter-shot-plotter is a small circle that is not filled yet. Later in the process, this should be green.*
         """
     )
 
     # Schritt 6
     show_step(
         6, 
-        "Container Einstellungen", 
+        "Container Settings", 
         """
-        Öffne **"Optional Settings"** indem du auf den weißen Pfeil klickst.
+        Open **"Optional Settings"** by clicking on the white arrow.
         """,
         """
         """
@@ -181,13 +205,13 @@ if page == "How to start":
     # Schritt 7
     show_step(
         7, 
-        "Container starten", 
+        "Start container", 
         """
-        Setze einen Namen für den Container. Vorzugsweise nenne ihn **shot-plotter**.
+        Set a name for the container. Preferably name it **shot-plotter**.
 
-        Wähle **8080:8080** als Port aus, indem du in das Eingabefeld **8080** eingibst.
+        Select **8080:8080** as the port by entering **8080** in the input field.
 
-        Klicke auf **Run**
+        Click on **Run**
         """,
         """
         """
@@ -196,15 +220,15 @@ if page == "How to start":
     # Schritt 8
     show_step(
         8, 
-        "Shot-Plotter im Browser öffnen", 
+        "Open Shot-Plotter in browser", 
          """
-        Der Container sollte nun gestartet worden sein. 
+        The container should now be started. 
 
-        Klicke nun auf den angezeigten Port. Im Bild ist dieser mit rot umrandet. 
+        Now click on the displayed port. In the image, it's outlined in red. 
 
-        *Hinweis: Im Bild ist 7001 der Port, bei dir sollte aber 8080 angezeigt werden, sofern du die Standard-Einstellungen verwendet hast.*
+        *Note: In the image, the port is 7001, but you should see 8080 if you used the default settings.*
 
-        Du solltest nun die Seite des Shot-Plotters sehen.
+        You should now see the Shot-Plotter page.
         """,
         """
         """
@@ -213,32 +237,35 @@ if page == "How to start":
     # Schritt 9
     show_step(
         9,
-        "Shot-Plotter im Browser öffnen",
+        "Open Shot-Plotter in browser",
         """
-        Du kannst die Seite des Shot-Plotters immer wieder unter http://localhost:8080 in deinem Browser aufrufen. (Sofern du die Standard-Einstellungen verwendet hast)
+        You can always access the Shot-Plotter page at http://localhost:8080 in your browser. (If you used the default settings)
 
-        *Hinweis: Safari und Firefox sind als Browser zu empfehlen, bei Chrome kann es zu Problemen kommen.*
+        *Note: Safari and Firefox are recommended browsers, Chrome may cause issues.*
 
-        Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden, wie auf dem Bild zu sehen.
-        Gehe dazu in Docker Desktop auf **"Containers"**. Dort müsste der Shot-Plotter unter **"shot-plotter"** zu sehen sein. Wenn du unter Port auf die Nummer klickst, öffnet sich der Shot-Plotter in deinem Browser.
+        Alternatively, you can open Docker Desktop and find the Shot-Plotter under **"Containers"**, as shown in the image.
+        Go to **"Containers"** in Docker Desktop. The Shot-Plotter should be visible under **"shot-plotter"**. When you click on the port number, the Shot-Plotter will open in your browser.
 
-        *Hinweis: Der Punkt neben dem Namen des Containers sollte grün sein, wenn der Container gestartet ist. Ist dieser nicht ausgefüllt und grau, musst du die Schritte nochmal wiederholen.*
+        *Note: The dot next to the container name should be green when the container is running. If it's not filled and gray, you need to repeat the steps.*
         """,
         """
         """
     )
 
-# Beispielablauf
-elif page == "Beispielablauf":
-    st.title("Beispielablauf")
+# Example Workflow
+elif page == "Example Workflow":
+    st.title("Example Workflow")
     
     # Funktion zum Anzeigen von Bildern mit Beschreibung für den Beispielablauf
-    def show_workflow_step(step_number, title, description, video_url=None):
+    def show_workflow_step(step_number, title, description, video_url=None, video_type="drive"):
         st.header(f"{title}")
         
         # Video anzeigen, falls ein Link vorhanden ist
         if video_url:
-            video_html = embed_google_drive_video(video_url)
+            if video_type == "youtube":
+                video_html = embed_youtube_video(video_url)
+            else:  # default to drive
+                video_html = embed_google_drive_video(video_url)
             if video_html:
                 st.components.v1.html(video_html, height=720)
         else:
@@ -247,7 +274,7 @@ elif page == "Beispielablauf":
             if os.path.exists(image_path):
                 st.image(image_path, use_container_width=True)
             else:
-                st.error(f"Bild '{image_path}' nicht gefunden")
+                st.error(f"Image '{image_path}' not found")
         
         # Beschreibung unter dem Video/Bild
         st.markdown(description)
@@ -256,12 +283,12 @@ elif page == "Beispielablauf":
     # Schritt 1 des Workflows
     show_workflow_step(
         1, 
-        "Aktion platzieren", 
+        "Place Action", 
         """
-        In diesem Video wird gezeigt, wie du eine Aktion auf dem Spielfeld platzierst:
+        This video shows how to place an action on the field:
 
-        1. Klicke auf das Spielfeld, um den Startpunkt einer Aktion zu markieren
-        2. Halte die Shift-Taste gedrückt und klicke erneut, um den Endpunkt zu setzen (für Pass, Schuss, etc.)
+        1. Click on the field to mark the starting point of an action
+        2. Hold the Shift key and click again to set the end point (for pass, shot, etc.)
         """,
         video_url="https://drive.google.com/file/d/1Sard0QX_EiRhO3mtN52QVg-MzfLNkoiO/view?usp=share_link"
     )
@@ -269,108 +296,101 @@ elif page == "Beispielablauf":
     # Schritt 2 des Workflows
     show_workflow_step(
         2, 
-        "Details eingeben", 
+        "Enter Details", 
         """
-        Im Seitenpanel kannst du folgende Informationen eintragen:
+        In the side panel, you can enter the following information:
         
-        1. **Halbzeit**: 1. oder 2. Halbzeit
-        2. **Gegnerdruck**: Stärke des gegnerischen Drucks (0-4)
-        3. **Outcome**: Erfolgreich oder Nicht Erfolgreich
-        4. **Passhöhe**: Flach, Hoch oder Über Kniehöhe
-        5. **Situation**: Aus dem Spiel, Anstoß, Abstoß, Ecke oder Freistoß
-        6. **Zeit**: Spielzeit in Minuten:Sekunden
-        7. **Aktionstyp**: Pass, Schuss, Dribbling, Kopfball oder Zweikampf
+        1. **Half**: 1st or 2nd half
+        2. **Opponent Pressure**: Strength of opponent pressure (0-4)
+        3. **Outcome**: Successful or Not Successful
+        4. **Pass Height**: Flat, High, or Above Knee Height
+        5. **Situation**: From Play, Kick-off, Goal Kick, Corner, or Free Kick
+        6. **Time**: Game time in minutes:seconds
+        7. **Action Type**: Pass, Shot, Dribbling, Header, or Duel
         """,
-        # Hier können Sie den Video-Link für Schritt 2 einfügen
-        # video_url="HIER_VIDEO_LINK_FÜR_SCHRITT_2"
-    )
-    
-    # Schritt 3 des Workflows
-    show_workflow_step(
-        3, 
-        "Aktion speichern", 
-        """
-        Klicke auf "Speichern", um die Aktion zu erfassen. Sie wird in der Tabelle unten angezeigt.
-        """
-    )
-    
-    # Komplettes Spiel analysieren
-    st.header("Komplettes Spiel analysieren")
-    show_workflow_step(
-        4, 
-        "Mehrere Aktionen verwalten", 
-        """
-        1. Erfasse nacheinander alle relevanten Aktionen
-        2. Verwende die Tabelle unten, um bereits erfasste Aktionen zu überprüfen
-        3. Nutze die Filter, um bestimmte Aktionstypen oder Situationen zu finden
-        4. Exportiere die Daten am Ende für weitere Analysen
-        """
+        # Here you can add the video link for step 2
+        # video_url="YOUR_VIDEO_LINK_FOR_STEP_2"
     )
 
-# Erklärung der Widgets
-elif page == "Erklärung der Widgets":
-    st.title("Erklärung der Widgets")
+    # Schritt 3 des Workflows
+    show_workflow_step(
+        3,
+        "Advanced Features",
+        """
+        This video demonstrates some advanced features of the Shot-Plotter:
+
+        1. How to use filters to analyze specific situations
+        2. How to export your data for further analysis
+        3. Tips and tricks for efficient data collection
+        """,
+        video_url="https://youtu.be/Ta6brrJ_ZFQ",
+        video_type="youtube"
+    )
+
+# Widget Explanation
+elif page == "Widget Explanation":
+    st.title("Widget Explanation")
     
     st.markdown("""
-    Die Widgets im Shot-Plotter ermöglichen die detaillierte Erfassung von Spielsituationen.
-    Hier ist eine Erklärung aller verfügbaren Widgets:
+    The widgets in Shot-Plotter enable detailed recording of game situations.
+    Here is an explanation of all available widgets:
     """)
     
     widgets = [
         {
-            "name": "Halbzeit",
+            "name": "Half",
             "type": "Radio Button",
             "options": ["1", "2"],
-            "description": "Gibt an, in welcher Halbzeit die Aktion stattgefunden hat."
+            "description": "Indicates in which half the action took place."
         },
         {
             "name": "Team",
             "type": "Radio Button",
-            "options": ["BVB", "Gegner"],
-            "description": "Gibt an, welches Team die Aktion ausgeführt hat."
+            "options": ["BVB", "Opponent"],
+            "description": "Indicates which team executed the action."
         },
         {
-            "name": "Gegnerdruck",
+            "name": "Opponent Pressure",
             "type": "Radio Button",
             "options": ["0", "1", "2", "3", "4"],
-            "description": "Gibt die Intensität des gegnerischen Drucks an. 0 = kein Druck, 4 = maximaler Druck."
+            "description": "Indicates the intensity of opponent pressure. 0 = no pressure, 4 = maximum pressure."
         },
         {
             "name": "Outcome",
             "type": "Radio Button",
-            "options": ["Erfolgreich", "Nicht Erfolgreich"],
-            "description": "Gibt an, ob die Aktion erfolgreich war oder nicht."
+            "options": ["Successful", "Not Successful"],
+            "description": "Indicates whether the action was successful or not."
         },
         {
-            "name": "Passhöhe",
+            "name": "Pass Height",
             "type": "Radio Button",
-            "options": ["Flach", "Hoch", "Über Kniehöhe"],
-            "description": "Gibt die Höhe des Passes an."
+            "options": ["Flat", "High", "Above Knee Height"],
+            "description": "Indicates the height of the pass."
         },
         {
             "name": "Situation",
             "type": "Radio Button",
-            "options": ["Aus dem Spiel", "Anstoß", "Abstoß", "Ecke", "Freistoß"],
-            "description": "Gibt die Spielsituation an, aus der die Aktion entstanden ist."
+            "options": ["From Play", "Kick-off", "Goal Kick", "Corner", "Free Kick"],
+            "description": "Indicates the game situation from which the action originated."
         },
         {
-            "name": "Zeit",
+            "name": "Time",
             "type": "Text",
-            "description": "Ermöglicht die Eingabe der Spielzeit im Format mm:ss."
+            "description": "Allows entering the game time in mm:ss format."
         },
         {
-            "name": "Aktionstyp",
+            "name": "Action Type",
             "type": "Dropdown",
-            "options": ["Pass", "Schuss", "Dribbling", "Kopfball", "Zweikampf"],
-            "description": "Gibt die Art der Aktion an."
+            "options": ["Pass", "Shot", "Dribbling", "Header", "Duel"],
+            "description": "Indicates the type of action."
         }
     ]
     
     for widget in widgets:
         with st.expander(f"{widget['name']} ({widget['type']})"):
-            st.markdown(f"**Beschreibung:** {widget['description']}")
+            st.markdown(f"**Description:** {widget['description']}")
             if "options" in widget:
-                st.markdown("**Optionen:**")
+                st.markdown("**Options:**")
                 for option in widget["options"]:
                     st.markdown(f"- {option}")
 
@@ -378,40 +398,40 @@ elif page == "Erklärung der Widgets":
 elif page == "Extras":
     st.title("Extras")
     
-    st.header("Anpassen der Widgets")
+    st.header("Customizing Widgets")
     st.markdown("""
-    Du kannst die verfügbaren Widgets und deren Optionen anpassen:
+    You can customize the available widgets and their options:
     
-    1. Öffne die Einstellungen über das Zahnrad-Symbol
-    2. Klicke auf "Create New Detail", um ein neues Widget hinzuzufügen
-    3. Wähle den Widget-Typ (Radio Button, Dropdown, Text, etc.)
-    4. Gib einen Titel und die verfügbaren Optionen ein
-    5. Speichere die Änderungen
+    1. Open settings via the gear icon
+    2. Click on "Create New Detail" to add a new widget
+    3. Choose the widget type (Radio Button, Dropdown, Text, etc.)
+    4. Enter a title and available options
+    5. Save the changes
     
-    Die Änderungen werden in der supported-sports.json-Datei gespeichert.
+    The changes will be saved in the supported-sports.json file.
     """)
     
-    st.header("Datenmerging")
+    st.header("Data Merging")
     st.markdown("""
-    Mit dem Datenmerging-Tool kannst du Daten aus dem Shot-Plotter mit anderen Datenquellen kombinieren:
+    With the data merging tool, you can combine data from Shot-Plotter with other data sources:
     
-    1. Exportiere die Daten aus dem Shot-Plotter als CSV
-    2. Öffne das Datenmerging-Tool (verfügbar unter http://localhost:8000)
-    3. Importiere die CSV-Datei und die zu verknüpfenden Daten
-    4. Führe die Verknüpfung durch und exportiere das Ergebnis
+    1. Export the data from Shot-Plotter as CSV
+    2. Open the data merging tool (available at http://localhost:8000)
+    3. Import the CSV file and the data to be linked
+    4. Perform the linking and export the result
     """)
     
-    st.header("Tipps und Tricks")
+    st.header("Tips and Tricks")
     st.markdown("""
-    ### Tastaturkürzel
+    ### Keyboard Shortcuts
     
-    - **Shift + Klick**: Zwei-Punkt-Aktion (z.B. Pass von A nach B)
-    - **ESC**: Aktuelle Aktion abbrechen
+    - **Shift + Click**: Two-point action (e.g., pass from A to B)
+    - **ESC**: Cancel current action
     
-    ### Fehlerbehebung
+    ### Troubleshooting
     
-    - **Browser-Cache leeren**: Bei Problemen mit der Anzeige
-    - **Docker-Container neu starten**: Bei allgemeinen Problemen
+    - **Clear Browser Cache**: For display issues
+    - **Restart Docker Container**: For general issues
     
     ```bash
     docker restart shot-plotter
@@ -422,53 +442,46 @@ elif page == "Extras":
 elif page == "Download":
     st.title("Download")
     
-    st.header("Shot-Plotter über Docker Desktop")
+    st.header("Shot-Plotter via Docker Desktop")
     st.markdown("""
-    Der einfachste Weg, den Shot-Plotter zu installieren, ist über Docker Desktop:
+    The easiest way to install Shot-Plotter is via Docker Desktop:
     
-    1. Öffne Docker Desktop
-    2. Klicke auf den Tab "Images"
-    3. Klicke auf "Pull" oder "Search on Docker Hub"
-    4. Suche nach `sindi98/shot-plotter-shot-plotter`
-    5. Wähle Tag `v1.2` aus und klicke auf "Pull"
+    1. Open Docker Desktop
+    2. Click on the "Images" tab
+    3. Click on "Pull" or "Search on Docker Hub"
+    4. Search for `sindi98/shot-plotter-shot-plotter`
+    5. Select tag `v1.2` and click on "Pull"
     
-    Eine detaillierte Anleitung mit Screenshots findest du im Bereich "How to start".
+    You can find a detailed guide with screenshots in the "How to start" section.
     """)
     
+    st.header("System Requirements")
     st.markdown("""
-    ### Shot-Plotter über Docker Desktop
-    """)
-    docker_hub_pull = load_image("7.png")
-    if docker_hub_pull:
-        st.image(docker_hub_pull, caption="Docker Hub Pull", use_container_width=True)
+    For Shot-Plotter you need:
     
-    st.header("Systemanforderungen")
-    st.markdown("""
-    Für den Shot-Plotter benötigst du:
-    
-    - Docker Desktop installiert
-    - Mind. 2 GB RAM
-    - Mind. 1 GB freier Speicherplatz
-    - Internetverbindung für den ersten Download
+    - Docker Desktop installed
+    - Min. 2 GB RAM
+    - Min. 1 GB free storage space
+    - Internet connection for initial download
     """)
     
-    st.header("Datenmerging-Tool herunterladen")
+    st.header("Download Data Merging Tool")
     st.markdown("""
-    Das Datenmerging-Tool ist ebenfalls über Docker Hub verfügbar:
+    The data merging tool is also available via Docker Hub:
     
-    1. Öffne Docker Desktop
-    2. Klicke auf den Tab "Images"
-    3. Klicke auf "Pull" oder "Search on Docker Hub"
-    4. Suche nach `sindi98/shot-plotter-data-merging`
-    5. Wähle das neueste Tag aus und klicke auf "Pull"
-    6. Starte das Tool mit Port 8000
+    1. Open Docker Desktop
+    2. Click on the "Images" tab
+    3. Click on "Pull" or "Search on Docker Hub"
+    4. Search for `sindi98/shot-plotter-data-merging`
+    5. Select the latest tag and click on "Pull"
+    6. Start the tool with port 8000
     """)
     
-    st.header("Komplettes System mit Docker Compose")
-    with st.expander("Für fortgeschrittene Benutzer"):
+    st.header("Complete System with Docker Compose")
+    with st.expander("For advanced users"):
         st.markdown("""
-        Du kannst auch alle Komponenten gleichzeitig mit Docker Compose starten.
-        Erstelle dazu eine Datei namens `docker-compose.yml` mit folgendem Inhalt:
+        You can also start all components simultaneously with Docker Compose.
+        Create a file named `docker-compose.yml` with the following content:
         
         ```yaml
         version: '3'
@@ -506,21 +519,21 @@ elif page == "Download":
             driver: bridge
         ```
         
-        Starte das System mit:
+        Start the system with:
         
         ```bash
         docker-compose up -d
         ```
         """)
     
-    st.header("Beispieldaten")
+    st.header("Sample Data")
     st.markdown("""
-    Hier kannst du Beispieldaten herunterladen, um den Shot-Plotter zu testen:
+    Here you can download sample data to test Shot-Plotter:
     
-    - [Beispiel-CSV für Shot-Plotter](#) (Link wird später eingefügt)
-    - [Beispiel-Datensatz für Datenmerging](#) (Link wird später eingefügt)
+    - [Sample CSV for Shot-Plotter](#) (Link will be added later)
+    - [Sample dataset for data merging](#) (Link will be added later)
     """)
 
 # Footer
 st.markdown("---")
-st.markdown("© 2024 BVB Kooperationsprojekt | Shot-Plotter v1.2 & Datenmerging") 
+st.markdown("© 2024 BVB Cooperation Project | Shot-Plotter v1.2 & Data Merging") 
