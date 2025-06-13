@@ -323,7 +323,7 @@ elif page == "Example Workflow":
         2. How to export your data for further analysis
         3. Tips and tricks for efficient data collection
         """,
-        video_url="https://youtu.be/Ta6brrJ_ZFQ",
+        video_url="https://youtu.be/boyOUWLbDII",
         video_type="youtube"
     )
 
