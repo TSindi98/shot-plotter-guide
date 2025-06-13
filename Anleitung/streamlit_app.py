@@ -177,10 +177,20 @@ if page == "How to start":
         Du solltest nun die Seite des Shot-Plotters sehen.
         """,
         """
+        """
+    )
+
+    # Schritt 9
+    show_step(
+        9,
+        "Shot-Plotter im Browser öffnen",
+        """
         Du kannst die Seite des Shot-Plotters immer wieder unter http://localhost:8080 in deinem Browser aufrufen.
         *Hinweis: Safari und Firefox sind als Browser zu empfehlen, bei Chrome kann es zu Problemen kommen.*
 
-        Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden.
+        Alternativ kannst du Docker Desktop öffnen und den Shot-Plotter unter **"Containers"** finden, wie auf dem Bild zu sehen.
+        Gehe dazu in Docker Desktop auf **"Containers"**. Dort müsste der Shot-Plotter unter **"shot-plotter"** zu sehen sein. Wenn du unter Port auf die Nummer klickst, öffnet sich der Shot-Plotter in deinem Browser.
+        *Hinweis: Der Punkt neben dem Namen des Containers sollte grün sein, wenn der Container gestartet ist. Ist dieser nicht ausgefüllt und grau, musst du die Schritte nochmal wiederholen.*
         """
     )
 
