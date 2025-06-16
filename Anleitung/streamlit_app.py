@@ -150,6 +150,8 @@ if page == "How to start":
         (Make sure to download the correct version for your operating system)
 
         Create a Docker account if you don't have one yet and sign in to Docker Desktop.
+
+        *Note: You have to verify your email address to use Docker Desktop. If you don't verify your email adress there will be an error when you try to pull the image later.*
         """,
         """
         Click on **DockerHub** on the left and search for **sindi98**
