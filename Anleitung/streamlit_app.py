@@ -335,75 +335,54 @@ elif page == "Widget Explanation":
     """)
     
     # Gegnerdruck
-    show_workflow_step(
-        1,
-        "Gegnerdruck",
-        """
+    with st.expander("Gegnerdruck"):
+        st.markdown("""
         Learn how to assess and record opponent pressure:
 
         1. Understanding pressure levels (0-4)
         2. How to evaluate pressure situations
         3. Tips for consistent pressure assessment
-        """,
-        video_url="https://drive.google.com/file/d/1LoD-_ej1sxA3JzCmbZqudO5s7kar8Vqi/view?usp=drive_link",
-        video_type="drive"
-    )
+        """)
+        st.components.v1.html(embed_google_drive_video("https://drive.google.com/file/d/1LoD-_ej1sxA3JzCmbZqudO5s7kar8Vqi/view?usp=drive_link"), height=720)
     
     # Outcome
-    show_workflow_step(
-        2,
-        "Outcome",
-        """
+    with st.expander("Outcome"):
+        st.markdown("""
         Understanding how to record action outcomes:
 
         1. Defining successful vs. unsuccessful actions
         2. Criteria for outcome assessment
         3. Examples of different outcomes
-        """,
-        video_url="https://drive.google.com/file/d/1UYiFCwREcc1iTMeGpAn5ydRKuyEnyDGH/view?usp=drive_link",
-        video_type="drive"
-    )
+        """)
+        st.components.v1.html(embed_google_drive_video("https://drive.google.com/file/d/1UYiFCwREcc1iTMeGpAn5ydRKuyEnyDGH/view?usp=drive_link"), height=720)
     
     # Aktionstyp
-    show_workflow_step(
-        3,
-        "Action Type",
-        """
+    with st.expander("Action Type"):
+        st.markdown("""
         Explanation of different action types
-
-        """,
-        video_url="https://drive.google.com/file/d/14KoviY4fIZHljKfGwbB6grmx4p4b0GH_/view?usp=drive_link",
-        video_type="drive"
-    )
+        """)
+        st.components.v1.html(embed_google_drive_video("https://drive.google.com/file/d/14KoviY4fIZHljKfGwbB6grmx4p4b0GH_/view?usp=drive_link"), height=720)
     
     # Passhöhe
-    show_workflow_step(
-        4,
-        "Passhöhe",
-        """
+    with st.expander("Passhöhe"):
+        st.markdown("""
         How to record pass heights accurately:
 
         1. Define the pass height
         2. Explain the different pass heights
-        """,
-        video_url="https://drive.google.com/file/d/1YqhLkeUpoepsXrN75hPQv0_KpOQB_H5O/view?usp=drive_link",
-        video_type="drive"
-    )
+        """)
+        st.components.v1.html(embed_google_drive_video("https://drive.google.com/file/d/1YqhLkeUpoepsXrN75hPQv0_KpOQB_H5O/view?usp=drive_link"), height=720)
     
     # Feldgröße
-    show_workflow_step(
-        5,
-        "Feldgröße",
-        """
+    with st.expander("Feldgröße"):
+        st.markdown("""
         Understanding field size settings and their impact:
 
         1. How to set up field dimensions
         2. Impact on analysis
         3. Best practices for different field sizes
-        """,
-        video_url="https://drive.google.com/file/d/1xuEg--KBDVLgLU65oevoi6hNp5dP0I1n/view?usp=drive_link",
-        video_type="drive"
-    )
+        """)
+        st.components.v1.html(embed_google_drive_video("https://drive.google.com/file/d/1xuEg--KBDVLgLU65oevoi6hNp5dP0I1n/view?usp=drive_link"), height=720)
     
     # Rest of the widget explanations
     widgets = [
