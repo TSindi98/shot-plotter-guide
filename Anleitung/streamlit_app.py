@@ -104,7 +104,7 @@ st.set_page_config(
 st.sidebar.title("Shot-Plotter Guide")
 page = st.sidebar.radio(
     "Navigation",
-    ["How to start", "Example Workflow", "Widget Explanation", "Download"]
+    ["How to start", "Basics", "Widget Explanation", "Download"]
 )
 
 # Funktion zum Einbetten lokaler Videos
