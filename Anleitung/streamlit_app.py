@@ -277,8 +277,8 @@ if page == "How to start":
     )
 
 # Example Workflow
-elif page == "Example Workflow":
-    st.title("Example Workflow")
+elif page == "Basics":
+    st.title("Basics")
     
     # Allgemeines Setup
     show_workflow_step(
