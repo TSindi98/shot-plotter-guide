@@ -1846,8 +1846,7 @@
                 "id": "passhohe",
                 "options": [
                     { "value": "Flach", "checked": true },
-                    { "value": "Hoch" },
-                    { "value": "Über Kniehöhe" }
+                    { "value": "Hoch" }
                 ]
             },
             {

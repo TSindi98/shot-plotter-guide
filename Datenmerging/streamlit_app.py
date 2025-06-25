@@ -12,6 +12,8 @@ import numpy as np
 import re
 import plotly.graph_objects as go
 import plotly.express as px
+from io import BytesIO, StringIO
+import zipfile
 
 # Seitentitel und Beschreibung
 st.set_page_config(page_title="Fußball-Passdaten Integration", layout="wide")
@@ -263,6 +265,9 @@ def process_playermaker_possession(df):
         if possession_type_col is not None:
             df['Possession Type'] = df[possession_type_col]
         
+        # Bereinige leere Strings im finalen DataFrame
+        df = clean_empty_strings(df)
+        
         st.success(f"Endzeit erfolgreich berechnet für {len(df)} Einträge")
         return df
     
@@ -364,6 +369,9 @@ def add_passed_to_and_from_column(possession_df, xml_events_df):
     
     st.success(f"passed_to-Werte: {passed_to_count}, passed_from-Werte: {passed_from_count} hinzugefügt")
     
+    # Bereinige leere Strings im finalen DataFrame
+    updated_possession_df = clean_empty_strings(updated_possession_df)
+    
     return updated_possession_df
 
 def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
@@ -377,6 +385,7 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
     - Passed to (aus XML)
     - Possession type (aus Possession Summary)
     - X, Y Koordinaten (aus CSV/Shot-Plotter)
+    - Neue Spalten: Team, Halbzeit, Gegnerdruck, Outcome, Passhöhe, Situation, Aktionstyp, X2, Y2
     """
     debug_mode = st.session_state.get('debug_matching', False)
     
@@ -417,6 +426,56 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
             if debug_mode:
                 st.success(f"Gefundene Player Name Spalte: {col}")
             break
+    
+    # Debug: Zeige alle verfügbaren Spalten in Possession-Daten
+    if debug_mode:
+        st.subheader("Debug: Verfügbare Spalten in Possession-Daten")
+        st.write("Alle Spalten:", possession_df.columns.tolist())
+        
+        if player_name_col:
+            st.write(f"Player Name Spalte gefunden: '{player_name_col}'")
+            st.write("Beispielwerte aus Player Name Spalte:")
+            sample_values = possession_df[player_name_col].dropna().head(10).tolist()
+            st.write(sample_values)
+        else:
+            st.warning("Keine Player Name Spalte gefunden!")
+            st.write("Suche nach alternativen Spalten...")
+            
+            # Suche nach alternativen Spaltennamen
+            alternative_cols = []
+            for col in possession_df.columns:
+                col_lower = str(col).lower()
+                if any(keyword in col_lower for keyword in ['player', 'name', 'spieler', 'code', 'id']):
+                    alternative_cols.append(col)
+            
+            if alternative_cols:
+                st.write("Gefundene alternative Spalten:", alternative_cols)
+                for col in alternative_cols:
+                    sample_values = possession_df[col].dropna().head(5).tolist()
+                    st.write(f"'{col}': {sample_values}")
+            else:
+                st.error("Keine alternativen Spieler-Spalten gefunden!")
+    
+    # Wenn keine Player Name Spalte gefunden wurde, versuche Alternativen
+    if player_name_col is None:
+        # Suche nach alternativen Spaltennamen
+        for col in possession_df.columns:
+            col_lower = str(col).lower()
+            if any(keyword in col_lower for keyword in ['player', 'name', 'spieler']):
+                player_name_col = col
+                if debug_mode:
+                    st.success(f"Alternative Player Name Spalte gefunden: {col}")
+                break
+        
+        # Falls immer noch nichts gefunden, verwende die erste Spalte, die nicht Zeit-bezogen ist
+        if player_name_col is None:
+            for col in possession_df.columns:
+                col_lower = str(col).lower()
+                if not any(keyword in col_lower for keyword in ['time', 'zeit', 'start', 'end', 'duration', 'dauer']):
+                    player_name_col = col
+                    if debug_mode:
+                        st.warning(f"Verwende Fallback-Spalte als Player Name: {col}")
+                    break
     
     # Debug-Info über die zu vergleichenden Zeiten
     if 'debug_matching' in st.session_state and st.session_state.get('debug_matching', False):
@@ -503,21 +562,27 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                     'Y': shot_row['Y']
                 }
                 
-                # Füge weitere Spalten aus Shot-Plotter hinzu, wenn vorhanden
-                if 'X2' in shot_row and pd.notna(shot_row['X2']):
-                    merged_entry['X2'] = shot_row['X2']
-                if 'Y2' in shot_row and pd.notna(shot_row['Y2']):
-                    merged_entry['Y2'] = shot_row['Y2']
-                if 'Type' in shot_row and pd.notna(shot_row['Type']):
-                    merged_entry['Type'] = shot_row['Type']
-                if 'Distance' in shot_row and pd.notna(shot_row['Distance']):
-                    merged_entry['Distance'] = shot_row['Distance']
-                if 'Outcome' in shot_row and pd.notna(shot_row['Outcome']):
-                    merged_entry['Outcome'] = shot_row['Outcome']
+                # Füge alle neuen Spalten aus Shot-Plotter hinzu
+                new_columns = ['Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp', 'X2', 'Y2']
+                for col in new_columns:
+                    if col in shot_row and pd.notna(shot_row[col]):
+                        merged_entry[col] = shot_row[col]
                 
                 # Spielername aus Possession Summary
                 if player_name_col and player_name_col in best_match and pd.notna(best_match[player_name_col]):
                     merged_entry['Player Name'] = best_match[player_name_col]
+                    if debug_mode:
+                        st.write(f"Player Name aus Possession Summary: {best_match[player_name_col]}")
+                else:
+                    # Fallback: Verwende passed_from aus XML als Player Name
+                    if 'passed_from' in best_match and pd.notna(best_match['passed_from']):
+                        merged_entry['Player Name'] = best_match['passed_from']
+                        if debug_mode:
+                            st.write(f"Player Name aus passed_from (XML): {best_match['passed_from']}")
+                    else:
+                        merged_entry['Player Name'] = 'Unbekannter Spieler'
+                        if debug_mode:
+                            st.write("Kein Player Name gefunden, verwende 'Unbekannter Spieler'")
                 
                 # Zeit (korrigierte Zeit aus Possession Summary)
                 merged_entry['Zeit'] = float(best_match['end_time_sec'])  # Explizite float-Konvertierung
@@ -555,17 +620,11 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                 'Zeit': float(shot_row['Time'])  # Verwende die Zeit aus Shot-Plotter
             }
             
-            # Füge weitere Spalten aus Shot-Plotter hinzu, wenn vorhanden
-            if 'X2' in shot_row and pd.notna(shot_row['X2']):
-                unmatched_entry['X2'] = shot_row['X2']
-            if 'Y2' in shot_row and pd.notna(shot_row['Y2']):
-                unmatched_entry['Y2'] = shot_row['Y2']
-            if 'Type' in shot_row and pd.notna(shot_row['Type']):
-                unmatched_entry['Type'] = shot_row['Type']
-            if 'Distance' in shot_row and pd.notna(shot_row['Distance']):
-                unmatched_entry['Distance'] = shot_row['Distance']
-            if 'Outcome' in shot_row and pd.notna(shot_row['Outcome']):
-                unmatched_entry['Outcome'] = shot_row['Outcome']
+            # Füge alle neuen Spalten aus Shot-Plotter hinzu
+            new_columns = ['Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp', 'X2', 'Y2']
+            for col in new_columns:
+                if col in shot_row and pd.notna(shot_row[col]):
+                    unmatched_entry[col] = shot_row[col]
             
             # Leere Werte für die anderen Felder
             unmatched_entry['passed_from'] = None
@@ -598,6 +657,30 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
             if 'passed_from' in result_df.columns:
                 st.warning("Player Name nicht gefunden. Verwende passed_from als Player Name.")
                 result_df['Player Name'] = result_df['passed_from']
+        
+        # Debug: Zeige Player Name Statistiken
+        if debug_mode and 'Player Name' in result_df.columns:
+            st.subheader("Debug: Player Name Analyse")
+            unique_players = result_df['Player Name'].dropna().unique()
+            st.write(f"Anzahl eindeutiger Player Names: {len(unique_players)}")
+            st.write("Eindeutige Player Names:")
+            for i, player in enumerate(unique_players[:10]):  # Zeige nur die ersten 10
+                count = (result_df['Player Name'] == player).sum()
+                st.write(f"  {i+1}. '{player}': {count} Einträge")
+            
+            if len(unique_players) > 10:
+                st.write(f"... und {len(unique_players) - 10} weitere")
+            
+            # Zeige auch passed_from und passed_to Werte
+            if 'passed_from' in result_df.columns:
+                unique_passed_from = result_df['passed_from'].dropna().unique()
+                st.write(f"Eindeutige passed_from Werte: {len(unique_passed_from)}")
+                st.write("Beispiele:", unique_passed_from[:5].tolist())
+            
+            if 'passed_to' in result_df.columns:
+                unique_passed_to = result_df['passed_to'].dropna().unique()
+                st.write(f"Eindeutige passed_to Werte: {len(unique_passed_to)}")
+                st.write("Beispiele:", unique_passed_to[:5].tolist())
     
     # Stelle sicher, dass alle gewünschten Spalten vorhanden sind
     for col in ['Player Name', 'passed_to', 'passed_from', 'Possession Type']:
@@ -605,7 +688,7 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
             result_df[col] = None
     
     # Definiere die Reihenfolge der Spalten entsprechend den Anforderungen
-    column_order = ['Player Name', 'Zeit', 'passed_from', 'passed_to', 'Possession Type', 'X', 'Y']
+    column_order = ['Player Name', 'Zeit', 'passed_from', 'passed_to', 'Possession Type', 'X', 'Y', 'X2', 'Y2', 'Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp']
     
     # Füge restliche Spalten hinzu
     for col in result_df.columns:
@@ -615,6 +698,9 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
     # Reihenfolge der Spalten anpassen (nur vorhandene Spalten)
     available_columns = [col for col in column_order if col in result_df.columns]
     result_df = result_df[available_columns]
+    
+    # Bereinige leere Strings im finalen DataFrame
+    result_df = clean_empty_strings(result_df)
     
     return result_df
 
@@ -727,23 +813,30 @@ def create_sportscode_xml(merged_data, player_col=None, time_window=4.0):
             ET.SubElement(end_y_label, "group").text = "End Y"
             ET.SubElement(end_y_label, "text").text = f"{row['Y2']:.2f}"
         
-        # Distanz
-        if 'Distance' in row and pd.notna(row['Distance']):
-            distance_label = ET.SubElement(instance, "label")
-            ET.SubElement(distance_label, "group").text = "Distance"
-            ET.SubElement(distance_label, "text").text = f"{row['Distance']:.2f}"
+        # Neue Spalten als Labels hinzufügen
+        new_columns = {
+            'Team': 'Team',
+            'Halbzeit': 'Halbzeit', 
+            'Gegnerdruck': 'Gegnerdruck',
+            'Outcome': 'Outcome',
+            'Passhöhe': 'Passhöhe',
+            'Situation': 'Situation',
+            'Aktionstyp': 'Aktionstyp'
+        }
         
-        # Typ
-        if 'Type' in row and pd.notna(row['Type']):
-            type_label = ET.SubElement(instance, "label")
-            ET.SubElement(type_label, "group").text = "Type"
-            ET.SubElement(type_label, "text").text = str(row['Type'])
+        for col, group_name in new_columns.items():
+            if col in row and pd.notna(row[col]):
+                new_label = ET.SubElement(instance, "label")
+                ET.SubElement(new_label, "group").text = group_name
+                ET.SubElement(new_label, "text").text = str(row[col])
         
-        # Outcome/Ergebnis
-        if 'Outcome' in row and pd.notna(row['Outcome']):
-            outcome_label = ET.SubElement(instance, "label")
-            ET.SubElement(outcome_label, "group").text = "Outcome"
-            ET.SubElement(outcome_label, "text").text = str(row['Outcome'])
+        # Legacy-Spalten (falls noch vorhanden)
+        legacy_columns = ['Distance', 'Type']
+        for col in legacy_columns:
+            if col in row and pd.notna(row[col]):
+                legacy_label = ET.SubElement(instance, "label")
+                ET.SubElement(legacy_label, "group").text = col
+                ET.SubElement(legacy_label, "text").text = str(row[col])
     
     # XML als String zurückgeben
     return ET.tostring(root, encoding='unicode')
@@ -844,11 +937,10 @@ def convert_time_to_seconds(time_str):
             if time_str.replace('.', '', 1).isdigit():
                 return float(time_str)
             
-            # Format MM:SS.HH oder MM:SS:HH
-            # Zuerst Prüfen, ob das Format MM:SS.HH ist
+            # Format MM:SS.HH (wie in der CSV: "0:00.00", "1:03.64")
             if ':' in time_str:
                 parts = time_str.split(':')
-                if len(parts) == 2:  # Format ist MM:SS.HH oder MM:SS,HH
+                if len(parts) == 2:  # Format ist MM:SS.HH
                     minutes = int(parts[0])
                     # Behandle den Sekundenteil
                     if '.' in parts[1]:
@@ -879,8 +971,44 @@ def convert_time_to_seconds(time_str):
     st.error(f"Ungültiges Zeitformat: {time_str}")
     return 0.0
 
+def clean_empty_strings(df):
+    """Konvertiert leere Strings zu NaN-Werten"""
+    # Kopie des DataFrames erstellen
+    df_cleaned = df.copy()
+    
+    # Für alle Spalten: leere Strings zu NaN konvertieren
+    for col in df_cleaned.columns:
+        if df_cleaned[col].dtype == 'object':  # Nur für String-Spalten
+            # Ersetze leere Strings und Whitespace-Strings mit NaN
+            df_cleaned[col] = df_cleaned[col].replace(['', ' ', '  ', '\t', '\n'], np.nan)
+    
+    return df_cleaned
+
+def fix_column_names(df):
+    """Korrigiert Spaltennamen, die durch Kodierungsprobleme beschädigt wurden"""
+    column_mapping = {
+        'Passhˆhe': 'Passhöhe',
+        'PasshÃ¶he': 'Passhöhe',
+        'PasshÃ¶he': 'Passhöhe',
+        'Anstoﬂ': 'Anstoß',
+        'AnstoÃŸ': 'Anstoß',
+        'AnstoÃ': 'Anstoß'
+    }
+    
+    # Korrigiere Spaltennamen
+    corrected_columns = []
+    for col in df.columns:
+        if col in column_mapping:
+            corrected_columns.append(column_mapping[col])
+            st.info(f"Spaltenname korrigiert: '{col}' -> '{column_mapping[col]}'")
+        else:
+            corrected_columns.append(col)
+    
+    df.columns = corrected_columns
+    return df
+
 # Definiere Tabs für den Workflow
-tabs = st.tabs(["Daten hochladen", "Daten verarbeiten", "Ergebnisse"])
+tabs = st.tabs(["Daten hochladen", "Daten verarbeiten", "Ergebnisse", "📄 XML Merger", "📊 CSV Merger", "🔧 JSON Merger"])
 
 # Bei App-Start den ersten Tab aktivieren
 if 'active_tab' not in st.session_state:
@@ -967,37 +1095,63 @@ with tabs[1]:
             try:
                 # Zurücksetzen des Dateizeigers
                 st.session_state.shot_plotter_file.seek(0)
-                shot_plotter_df = pd.read_csv(st.session_state.shot_plotter_file)
                 
-                # Zeige Daten vor der Konvertierung
-                st.write("Shot-Plotter Daten vor der Zeitkonvertierung:")
-                st.write(shot_plotter_df.head())
+                # Versuche verschiedene Kodierungen für deutsche Umlaute
+                encodings_to_try = ['utf-8', 'iso-8859-1', 'windows-1252', 'latin-1']
+                shot_plotter_df = None
                 
-                # Überprüfe, ob die Time-Spalte existiert
-                if 'Time' in shot_plotter_df.columns:
-                    # Überprüfe und konvertiere das Zeitformat
-                    time_sample = str(shot_plotter_df['Time'].iloc[0]) if not shot_plotter_df.empty else ""
-                    st.write(f"Erkanntes Zeitformat: {time_sample}")
+                for encoding in encodings_to_try:
+                    try:
+                        st.session_state.shot_plotter_file.seek(0)  # Zurücksetzen für jeden Versuch
+                        shot_plotter_df = pd.read_csv(st.session_state.shot_plotter_file, encoding=encoding)
+                        st.success(f"CSV erfolgreich mit Kodierung '{encoding}' geladen")
+                        break
+                    except UnicodeDecodeError:
+                        st.warning(f"Kodierung '{encoding}' funktioniert nicht, versuche nächste...")
+                        continue
+                    except Exception as e:
+                        st.warning(f"Fehler mit Kodierung '{encoding}': {str(e)}")
+                        continue
+                
+                if shot_plotter_df is None:
+                    st.error("Konnte CSV mit keiner der versuchten Kodierungen laden")
+                    st.session_state.shot_plotter_df = pd.DataFrame()
+                else:
+                    # Korrigiere Spaltennamen, falls nötig
+                    shot_plotter_df = fix_column_names(shot_plotter_df)
                     
-                    # Prüfe, ob die Zeit konvertiert werden muss
-                    if ':' in time_sample or '.' in time_sample:
-                        st.info(f"Konvertiere Zeitformat '{time_sample}' zu Sekunden...")
-                        # Speichere das Originalformat
-                        shot_plotter_df['Original_Time'] = shot_plotter_df['Time']
-                        # Konvertiere zu Sekunden
-                        shot_plotter_df['Time'] = shot_plotter_df['Time'].apply(convert_time_to_seconds)
+                    # Bereinige leere Strings
+                    shot_plotter_df = clean_empty_strings(shot_plotter_df)
+                    
+                    # Zeige Daten vor der Konvertierung
+                    st.write("Shot-Plotter Daten vor der Zeitkonvertierung:")
+                    st.write(shot_plotter_df.head())
+                    
+                    # Überprüfe, ob die Time-Spalte existiert
+                    if 'Time' in shot_plotter_df.columns:
+                        # Überprüfe und konvertiere das Zeitformat
+                        time_sample = str(shot_plotter_df['Time'].iloc[0]) if not shot_plotter_df.empty else ""
+                        st.write(f"Erkanntes Zeitformat: {time_sample}")
                         
-                        # Zeige Ergebnis der Konvertierung
-                        conversion_sample = pd.DataFrame({
-                            'Original': shot_plotter_df['Original_Time'].head(5),
-                            'Sekunden': shot_plotter_df['Time'].head(5)
-                        })
-                        st.write("Zeitkonvertierung (Beispiel):")
-                        st.write(conversion_sample)
-                
-                # Speichere das DataFrame im Session State
-                st.session_state.shot_plotter_df = shot_plotter_df
-                st.success(f"Shot-Plotter CSV geladen: {len(shot_plotter_df)} Einträge")
+                        # Prüfe, ob die Zeit konvertiert werden muss
+                        if ':' in time_sample or '.' in time_sample:
+                            st.info(f"Konvertiere Zeitformat '{time_sample}' zu Sekunden...")
+                            # Speichere das Originalformat
+                            shot_plotter_df['Original_Time'] = shot_plotter_df['Time']
+                            # Konvertiere zu Sekunden
+                            shot_plotter_df['Time'] = shot_plotter_df['Time'].apply(convert_time_to_seconds)
+                            
+                            # Zeige Ergebnis der Konvertierung
+                            conversion_sample = pd.DataFrame({
+                                'Original': shot_plotter_df['Original_Time'].head(5),
+                                'Sekunden': shot_plotter_df['Time'].head(5)
+                            })
+                            st.write("Zeitkonvertierung (Beispiel):")
+                            st.write(conversion_sample)
+                    
+                    # Speichere das DataFrame im Session State
+                    st.session_state.shot_plotter_df = shot_plotter_df
+                    st.success(f"Shot-Plotter CSV geladen: {len(shot_plotter_df)} Einträge")
             except Exception as e:
                 st.error(f"Fehler beim Laden der CSV: {str(e)}")
                 import traceback
@@ -1011,7 +1165,12 @@ with tabs[1]:
                 st.session_state.xml_file.seek(0)
                 st.write("XML wird geparst...")
                 events = parse_playermaker_data(st.session_state.xml_file)
-                st.session_state.xml_events = pd.DataFrame([event.to_dict() for event in events])
+                xml_df = pd.DataFrame([event.to_dict() for event in events])
+                
+                # Bereinige leere Strings
+                xml_df = clean_empty_strings(xml_df)
+                
+                st.session_state.xml_events = xml_df
                 st.success(f"XML erfolgreich geparst: {len(st.session_state.xml_events)} Einträge")
             except Exception as e:
                 st.error(f"Fehler beim Parsen der XML: {str(e)}")
@@ -1051,6 +1210,9 @@ with tabs[1]:
                 # Zeige die ersten Zeilen zur Überprüfung
                 st.write("Vorschau der gelesenen Daten:")
                 st.write(df.head(3))
+                
+                # Bereinige leere Strings
+                df = clean_empty_strings(df)
                 
                 # Verarbeite die Daten weiter
                 st.session_state.possession_df = process_playermaker_possession(df)
@@ -1296,7 +1458,15 @@ with tabs[2]:
         - **passed_from**: Ballabsender aus XML
         - **passed_to**: Ballempfänger aus XML
         - **Possession Type**: Art des Ballbesitzes aus der Possession Summary
-        - **X, Y**: Koordinaten aus dem Shot-Plotter (manuelle CSV)
+        - **X, Y**: Startkoordinaten aus dem Shot-Plotter (manuelle CSV)
+        - **X2, Y2**: Endkoordinaten aus dem Shot-Plotter (manuelle CSV)
+        - **Team**: Team-Information aus der CSV
+        - **Halbzeit**: Halbzeit-Information aus der CSV
+        - **Gegnerdruck**: Gegnerdruck-Kategorie aus der CSV
+        - **Outcome**: Ergebnis des Passes aus der CSV
+        - **Passhöhe**: Höhe des Passes aus der CSV
+        - **Situation**: Spielsituation aus der CSV
+        - **Aktionstyp**: Typ der Aktion aus der CSV
         """)
         
         # Anzeigen der zusammengeführten Daten
@@ -1313,28 +1483,53 @@ with tabs[2]:
             
             with col1:
                 if 'Outcome' in merged_data.columns:
-                    success_count = merged_data[merged_data['Outcome'] == 'Erfolgreich'].shape[0]
-                    fail_count = merged_data[merged_data['Outcome'] == 'Nicht_Erfolgreich'].shape[0]
-                    success_rate = success_count / (success_count + fail_count) * 100 if (success_count + fail_count) > 0 else 0
-                    st.metric("Erfolgsrate", f"{success_rate:.1f}%")
+                    # Anpassung für verschiedene Outcome-Formate
+                    outcome_values = merged_data['Outcome'].dropna().unique()
+                    st.write("Verfügbare Outcome-Werte:", outcome_values)
                     
-                    # Kreisdiagramm
-                    fig = px.pie(
-                        names=['Erfolgreich', 'Nicht erfolgreich'],
-                        values=[success_count, fail_count],
-                        color_discrete_sequence=['#4CAF50', '#F44336'],
-                        title='Passerfolg'
-                    )
-                    st.plotly_chart(fig)
+                    # Erfolgreich/Erfolgreich basierend auf den tatsächlichen Werten
+                    success_keywords = ['Erfolgreich', 'erfolgreich', 'Success', 'success', 'Goal', 'goal']
+                    success_count = 0
+                    total_count = 0
+                    
+                    for outcome in outcome_values:
+                        count = (merged_data['Outcome'] == outcome).sum()
+                        total_count += count
+                        if any(keyword in str(outcome) for keyword in success_keywords):
+                            success_count += count
+                    
+                    if total_count > 0:
+                        success_rate = success_count / total_count * 100
+                        st.metric("Erfolgsrate", f"{success_rate:.1f}%")
+                        
+                        # Kreisdiagramm
+                        fail_count = total_count - success_count
+                        fig = px.pie(
+                            names=['Erfolgreich', 'Nicht erfolgreich'],
+                            values=[success_count, fail_count],
+                            color_discrete_sequence=['#4CAF50', '#F44336'],
+                            title='Passerfolg'
+                        )
+                        st.plotly_chart(fig)
+                    else:
+                        st.info("Keine Outcome-Daten verfügbar")
             
             with col2:
-                if 'Distance' in merged_data.columns:
-                    avg_distance = merged_data['Distance'].mean()
-                    max_distance = merged_data['Distance'].max()
-                    min_distance = merged_data['Distance'].min()
-                    st.metric("Durchschn. Passdistanz", f"{avg_distance:.1f} m")
-                    st.metric("Längster Pass", f"{max_distance:.1f} m")
-                    st.metric("Kürzester Pass", f"{min_distance:.1f} m")
+                # Neue Spalten für Statistiken
+                if 'Passhöhe' in merged_data.columns:
+                    passhöhe_values = merged_data['Passhöhe'].dropna().unique()
+                    st.metric("Anzahl Passhöhen-Kategorien", len(passhöhe_values))
+                    st.write("Passhöhen:", ", ".join([str(v) for v in passhöhe_values]))
+                
+                if 'Gegnerdruck' in merged_data.columns:
+                    gegnerdruck_values = merged_data['Gegnerdruck'].dropna().unique()
+                    st.metric("Anzahl Gegnerdruck-Kategorien", len(gegnerdruck_values))
+                    st.write("Gegnerdruck:", ", ".join([str(v) for v in gegnerdruck_values]))
+                
+                if 'Situation' in merged_data.columns:
+                    situation_values = merged_data['Situation'].dropna().unique()
+                    st.metric("Anzahl Situationen", len(situation_values))
+                    st.write("Situationen:", ", ".join([str(v) for v in situation_values]))
             
             with col3:
                 # Zeige relevante Spielerinformationen
@@ -1344,12 +1539,18 @@ with tabs[2]:
                         unique_values = merged_data[col].dropna().unique()
                         st.metric(f"Anzahl {col}", len(unique_values))
                 
-                # Typ-Verteilung, wenn vorhanden
-                if 'Type' in merged_data.columns:
-                    type_counts = merged_data['Type'].value_counts()
-                    st.write("Pass-Typen:")
-                    for typ, count in type_counts.items():
+                # Aktionstyp-Verteilung, wenn vorhanden
+                if 'Aktionstyp' in merged_data.columns:
+                    aktionstyp_counts = merged_data['Aktionstyp'].value_counts()
+                    st.write("Aktionstypen:")
+                    for typ, count in aktionstyp_counts.items():
                         st.text(f"{typ}: {count}")
+                
+                # Team-Information, wenn vorhanden
+                if 'Team' in merged_data.columns:
+                    team_values = merged_data['Team'].dropna().unique()
+                    st.metric("Anzahl Teams", len(team_values))
+                    st.write("Teams:", ", ".join([str(t) for t in team_values]))
             
             # Spielerinformationen-Tabelle hinzufügen
             st.subheader("Spielerstatistiken")
@@ -1375,7 +1576,12 @@ with tabs[2]:
                         stats["Pässe als Hauptakteur"] = len(player_passes)
                         
                         if 'Outcome' in merged_data.columns and len(player_passes) > 0:
-                            success = player_passes[player_passes['Outcome'] == 'Erfolgreich'].shape[0]
+                            # Erfolgsrate basierend auf Outcome
+                            success_keywords = ['Erfolgreich', 'erfolgreich', 'Success', 'success', 'Goal', 'goal']
+                            success = 0
+                            for outcome in player_passes['Outcome'].dropna():
+                                if any(keyword in str(outcome) for keyword in success_keywords):
+                                    success += 1
                             stats["Erfolgsrate"] = f"{success / len(player_passes) * 100:.1f}%" if len(player_passes) > 0 else "N/A"
                     
                     # Als Absender
@@ -1408,7 +1614,23 @@ with tabs[2]:
             # Tooltip-Texte mit Spielerinformationen
             hover_texts = []
             for i, row in merged_data.iterrows():
-                text = f"Zeit: {row['Zeit']:.1f}s<br>Distanz: {row['Distance']:.1f}m<br>Ergebnis: {row['Outcome']}"
+                text = f"Zeit: {row['Zeit']:.1f}s"
+                
+                # Füge neue Spalten zu den Tooltips hinzu
+                if 'Outcome' in row and pd.notna(row['Outcome']):
+                    text += f"<br>Ergebnis: {row['Outcome']}"
+                if 'Team' in row and pd.notna(row['Team']):
+                    text += f"<br>Team: {row['Team']}"
+                if 'Halbzeit' in row and pd.notna(row['Halbzeit']):
+                    text += f"<br>Halbzeit: {row['Halbzeit']}"
+                if 'Gegnerdruck' in row and pd.notna(row['Gegnerdruck']):
+                    text += f"<br>Gegnerdruck: {row['Gegnerdruck']}"
+                if 'Passhöhe' in row and pd.notna(row['Passhöhe']):
+                    text += f"<br>Passhöhe: {row['Passhöhe']}"
+                if 'Situation' in row and pd.notna(row['Situation']):
+                    text += f"<br>Situation: {row['Situation']}"
+                if 'Aktionstyp' in row and pd.notna(row['Aktionstyp']):
+                    text += f"<br>Aktionstyp: {row['Aktionstyp']}"
                 
                 # Füge Spielerinformationen hinzu, wenn vorhanden
                 if 'Player Name' in row and pd.notna(row['Player Name']):
@@ -1423,13 +1645,25 @@ with tabs[2]:
             # Erzeuge den Feldplot mit aktualisierten Tooltips
             field_fig = go.Figure()
             
+            # Farbcodierung basierend auf Outcome
+            colors = []
+            for i, row in merged_data.iterrows():
+                if 'Outcome' in row and pd.notna(row['Outcome']):
+                    outcome = str(row['Outcome']).lower()
+                    if any(keyword in outcome for keyword in ['erfolgreich', 'success', 'goal']):
+                        colors.append('green')
+                    else:
+                        colors.append('red')
+                else:
+                    colors.append('blue')  # Standardfarbe wenn kein Outcome vorhanden
+            
             # Füge Scatter-Plot für Startpositionen hinzu
             field_fig.add_trace(go.Scatter(
                 x=merged_data['X'],
                 y=merged_data['Y'],
                 mode='markers',
                 marker=dict(
-                    color=['green' if o == 'Erfolgreich' else 'red' for o in merged_data['Outcome']],
+                    color=colors,
                     size=8
                 ),
                 text=hover_texts,
@@ -1437,19 +1671,21 @@ with tabs[2]:
                 name='Startpositionen'
             ))
             
-            # Füge Linien für Pässe hinzu
-            for i, row in merged_data.iterrows():
-                field_fig.add_trace(go.Scatter(
-                    x=[row['X'], row['X2']],
-                    y=[row['Y'], row['Y2']],
-                    mode='lines',
-                    line=dict(
-                        color='green' if row['Outcome'] == 'Erfolgreich' else 'red',
-                        width=1
-                    ),
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
+            # Füge Linien für Pässe hinzu (nur wenn X2 und Y2 vorhanden sind)
+            if 'X2' in merged_data.columns and 'Y2' in merged_data.columns:
+                for i, row in merged_data.iterrows():
+                    if pd.notna(row['X2']) and pd.notna(row['Y2']):
+                        field_fig.add_trace(go.Scatter(
+                            x=[row['X'], row['X2']],
+                            y=[row['Y'], row['Y2']],
+                            mode='lines',
+                            line=dict(
+                                color=colors[i] if i < len(colors) else 'blue',
+                                width=1
+                            ),
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ))
             
             # Füge Spielernamen als Annotation hinzu, wenn vorhanden
             if has_player_info:
@@ -1606,7 +1842,7 @@ with tabs[2]:
         st.subheader("Daten exportieren")
         
         # Definiere die Hauptspalten für den Export und stelle sicher, dass sie in der richtigen Reihenfolge sind
-        main_columns = ['Player Name', 'Zeit', 'passed_from', 'passed_to', 'Possession Type', 'X', 'Y']
+        main_columns = ['Player Name', 'Zeit', 'passed_from', 'passed_to', 'Possession Type', 'X', 'Y', 'X2', 'Y2', 'Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp']
         available_main_columns = [col for col in main_columns if col in merged_data.columns]
         other_columns = [col for col in merged_data.columns if col not in main_columns]
         export_columns = available_main_columns + other_columns
@@ -1618,7 +1854,7 @@ with tabs[2]:
         
         with col1:
             # CSV Export
-            csv = export_data.to_csv(index=False)
+            csv = export_data.to_csv(index=False, na_rep='Keine Angabe')
             st.download_button(
                 label="Als CSV herunterladen",
                 data=csv,
@@ -1639,7 +1875,7 @@ with tabs[2]:
         with col3:
             # Excel Export
             buffer = io.BytesIO()
-            export_data.to_excel(buffer, index=False)
+            export_data.to_excel(buffer, index=False, na_rep='Keine Angabe')
             buffer.seek(0)
             st.download_button(
                 label="Als Excel herunterladen",
@@ -1664,10 +1900,13 @@ with tabs[2]:
                     - `passed to`: nächste Ballstation
                     - `Start X`, `Start Y`: Startposition
                     - `End X`, `End Y`: Endposition
-                    - `Distance`: Passdistanz
-                    - `Type`: Passtyp
+                    - `Team`: Team-Information
+                    - `Halbzeit`: Halbzeit-Information
+                    - `Gegnerdruck`: Gegnerdruck-Kategorie
                     - `Outcome`: Ergebnis des Passes
-                    - `Time to Release`: Zeit bis zum Abspiel
+                    - `Passhöhe`: Höhe des Passes
+                    - `Situation`: Spielsituation
+                    - `Aktionstyp`: Typ der Aktion
                     - `Possession Type`: Art des Ballbesitzes
                 - Die `<start>` und `<end>` Zeiten definieren das Zeitfenster um den Zeitpunkt des Passes
                 """)
@@ -1749,3 +1988,584 @@ with tabs[2]:
         if st.button("Zurück zur Datenverarbeitung", key="go_to_processing"):
             change_tab(1)
             st.rerun() 
+
+# XML Merger Functions
+def parse_xml_file_merger(uploaded_file):
+    """Parse uploaded XML file and return the root element"""
+    try:
+        content = uploaded_file.read()
+        root = ET.fromstring(content)
+        uploaded_file.seek(0)  # Reset file pointer
+        return root, content
+    except ET.ParseError as e:
+        st.error(f"Fehler beim Parsen der XML-Datei {uploaded_file.name}: {e}")
+        return None, None
+
+def adjust_time_values_xml(element, time_offset):
+    """Recursively adjust all time values in the XML by adding the offset"""
+    for child in element:
+        if child.tag in ['start', 'end'] and child.text:
+            try:
+                original_time = float(child.text)
+                new_time = original_time + time_offset
+                child.text = str(new_time)
+            except ValueError:
+                pass  # Skip if not a valid number
+        
+        # Recursively process child elements
+        adjust_time_values_xml(child, time_offset)
+
+def merge_xml_quarters(xml_data_list, quarter_offsets):
+    """Merge multiple XML quarters into one"""
+    if not xml_data_list:
+        return None
+    
+    # Use the first XML as the base
+    base_root = xml_data_list[0]['root']
+    base_instances = base_root.find('ALL_INSTANCES')
+    
+    if base_instances is None:
+        st.error("Keine ALL_INSTANCES Sektion in der ersten XML-Datei gefunden")
+        return None
+    
+    # Get the highest ID from base instances
+    max_id = 0
+    for instance in base_instances.findall('instance'):
+        id_element = instance.find('ID')
+        if id_element is not None and id_element.text:
+            try:
+                max_id = max(max_id, int(id_element.text))
+            except ValueError:
+                pass
+    
+    # Adjust times in the base XML (first quarter)
+    adjust_time_values_xml(base_instances, quarter_offsets[0])
+    
+    # Add instances from other quarters
+    for i, xml_data in enumerate(xml_data_list[1:], 1):
+        quarter_root = xml_data['root']
+        quarter_instances = quarter_root.find('ALL_INSTANCES')
+        
+        if quarter_instances is None:
+            st.warning(f"Keine ALL_INSTANCES in Viertel {i+1} gefunden, überspringe...")
+            continue
+        
+        # Adjust times in this quarter
+        adjust_time_values_xml(quarter_instances, quarter_offsets[i])
+        
+        # Add all instances from this quarter to the base
+        for instance in quarter_instances.findall('instance'):
+            # Update the ID to avoid conflicts
+            max_id += 1
+            id_element = instance.find('ID')
+            if id_element is not None:
+                id_element.text = str(max_id)
+            
+            # Add the instance to the base
+            base_instances.append(instance)
+    
+    return base_root
+
+def create_xml_download_file(merged_root, filename):
+    """Create downloadable XML file"""
+    xml_str = ET.tostring(merged_root, encoding='unicode', xml_declaration=True)
+    return xml_str.encode('utf-8')
+
+# Tab 4: XML Merger
+with tabs[3]:
+    st.header("XML-Dateien zusammenführen")
+    st.markdown("**Führen Sie XML-Dateien verschiedener Spielviertel zu einer zusammenhängenden Datei zusammen**")
+    
+    # File upload section
+    st.subheader("1. XML-Dateien hochladen")
+    xml_merger_files = st.file_uploader(
+        "Wählen Sie die XML-Dateien der Viertel aus",
+        type=['xml'],
+        accept_multiple_files=True,
+        help="Laden Sie die XML-Dateien in der Reihenfolge der Viertel hoch (1. Viertel, 2. Viertel, etc.)",
+        key="xml_merger_uploader"
+    )
+
+    if xml_merger_files:
+        st.success(f"{len(xml_merger_files)} XML-Datei(en) hochgeladen")
+        
+        # Parse XML files
+        xml_merger_data = []
+        valid_xml_files = True
+        
+        for i, file in enumerate(xml_merger_files):
+            st.write(f"**Viertel {i+1}:** {file.name}")
+            root, content = parse_xml_file_merger(file)
+            if root is not None:
+                xml_merger_data.append({
+                    'root': root,
+                    'filename': file.name,
+                    'quarter': i+1
+                })
+            else:
+                valid_xml_files = False
+                break
+        
+        if valid_xml_files and xml_merger_data:
+            st.subheader("2. Startzeiten für Viertel konfigurieren")
+            st.markdown("Geben Sie die Startzeit für jedes Viertel in Sekunden an:")
+            
+            xml_quarter_offsets = []
+            
+            # Create columns for time inputs
+            cols = st.columns(min(len(xml_merger_data), 4))
+            
+            for i, data in enumerate(xml_merger_data):
+                col_idx = i % len(cols)
+                with cols[col_idx]:
+                    st.subheader(f"Viertel {i+1}")
+                    st.write(f"📁 {data['filename']}")
+                    
+                    if i == 0:
+                        # First quarter starts at 0
+                        offset = st.number_input(
+                            f"Startzeit (Sek)",
+                            min_value=0.0,
+                            value=0.0,
+                            step=1.0,
+                            key=f"xml_merger_offset_{i}"
+                        )
+                    else:
+                        # Suggest offset based on previous quarter
+                        suggested_offset = sum(xml_quarter_offsets) + 900  # 15 minutes default
+                        offset = st.number_input(
+                            f"Startzeit (Sek)",
+                            min_value=0.0,
+                            value=float(suggested_offset),
+                            step=1.0,
+                            key=f"xml_merger_offset_{i}",
+                            help=f"Vorschlag: {suggested_offset} Sek (15 Min pro Viertel)"
+                        )
+                    
+                    xml_quarter_offsets.append(offset)
+                    
+                    # Show time in minutes for better understanding
+                    minutes = int(offset // 60)
+                    seconds = int(offset % 60)
+                    st.caption(f"⏰ {minutes}:{seconds:02d} Min")
+            
+            # Preview section
+            st.subheader("3. Vorschau")
+            
+            preview_cols = st.columns(len(xml_merger_data))
+            
+            for i, (data, offset) in enumerate(zip(xml_merger_data, xml_quarter_offsets)):
+                with preview_cols[i]:
+                    st.subheader(f"Viertel {i+1}")
+                    instances = data['root'].find('ALL_INSTANCES')
+                    if instances is not None:
+                        instance_count = len(instances.findall('instance'))
+                        st.metric("Anzahl Events", instance_count)
+                        st.metric("Startzeit", f"{int(offset//60)}:{int(offset%60):02d}")
+            
+            # Merge button
+            st.subheader("4. Zusammenführen")
+            
+            col1, col2 = st.columns([1, 3])
+            
+            with col1:
+                xml_merge_button = st.button("🔄 XML-Dateien zusammenführen", type="primary", key="xml_merger_merge")
+            
+            with col2:
+                xml_output_filename = st.text_input(
+                    "Dateiname für zusammengeführte XML",
+                    value="merged_match.xml",
+                    help="Name der resultierenden XML-Datei",
+                    key="xml_merger_filename"
+                )
+            
+            if xml_merge_button:
+                with st.spinner("Führe XML-Dateien zusammen..."):
+                    try:
+                        merged_root = merge_xml_quarters(xml_merger_data, xml_quarter_offsets)
+                        
+                        if merged_root is not None:
+                            # Create download file
+                            xml_content = create_xml_download_file(merged_root, xml_output_filename)
+                            
+                            st.success("✅ XML-Dateien erfolgreich zusammengeführt!")
+                            
+                            # Show statistics
+                            merged_instances = merged_root.find('ALL_INSTANCES')
+                            if merged_instances is not None:
+                                total_instances = len(merged_instances.findall('instance'))
+                                st.metric("Gesamte Events in der zusammengeführten Datei", total_instances)
+                            
+                            # Download button
+                            st.download_button(
+                                label="📥 Zusammengeführte XML herunterladen",
+                                data=xml_content,
+                                file_name=xml_output_filename,
+                                mime="application/xml",
+                                key="xml_merger_download"
+                            )
+                            
+                            # Show success message with file info
+                            st.info(f"Die Datei '{xml_output_filename}' wurde erfolgreich erstellt und kann heruntergeladen werden.")
+                            
+                    except Exception as e:
+                        st.error(f"Fehler beim Zusammenführen: {str(e)}")
+
+    else:
+        st.info("👆 Laden Sie XML-Dateien hoch, um zu beginnen")
+    
+    # Help section
+    st.markdown("---")
+    with st.expander("ℹ️ Hilfe und Beispiele"):
+        st.markdown("""
+        ### Wie funktioniert der XML-Merger?
+        
+        **Funktionsweise:**
+        - Erwartet XML-Dateien mit `ALL_INSTANCES` Elementen
+        - Passt `start` und `end` Zeitangaben an
+        - Führt alle `instance` Elemente zusammen
+        - Verhindert ID-Konflikte durch automatische Neunummerierung
+        
+        ### Beispiel Startzeiten:
+        - **1. Viertel**: 0 Sekunden (0:00)
+        - **2. Viertel**: 900 Sekunden (15:00) 
+        - **3. Viertel**: 1800 Sekunden (30:00)
+        - **4. Viertel**: 2700 Sekunden (45:00)
+        
+        ### XML-Struktur:
+        Die App erwartet XML-Dateien mit folgender Grundstruktur:
+        ```xml
+        <file>
+          <ALL_INSTANCES>
+            <instance>
+              <ID>1</ID>
+              <start>16.87</start>
+              <end>44.26</end>
+              <code>...</code>
+              <label>...</label>
+            </instance>
+          </ALL_INSTANCES>
+        </file>
+        ```
+        """) 
+
+# CSV Merger Functions
+def parse_csv_file_merger(uploaded_file):
+    """Parse uploaded CSV file and return DataFrame"""
+    try:
+        # Try different encodings
+        content = uploaded_file.read()
+        uploaded_file.seek(0)
+        
+        try:
+            df = pd.read_csv(uploaded_file, encoding='utf-8')
+        except UnicodeDecodeError:
+            uploaded_file.seek(0)
+            df = pd.read_csv(uploaded_file, encoding='latin-1')
+        
+        uploaded_file.seek(0)
+        return df
+    except Exception as e:
+        st.error(f"Fehler beim Parsen der CSV-Datei {uploaded_file.name}: {e}")
+        return None
+
+def adjust_time_values_csv_merger(df, time_offset, time_column='Zeit'):
+    """Adjust time values in CSV DataFrame"""
+    df_copy = df.copy()
+    if time_column in df_copy.columns:
+        try:
+            df_copy[time_column] = pd.to_numeric(df_copy[time_column], errors='coerce') + time_offset
+        except Exception as e:
+            st.error(f"Fehler beim Anpassen der Zeitwerte: {e}")
+    return df_copy
+
+def merge_csv_quarters_merger(csv_data_list, quarter_offsets, time_column='Zeit'):
+    """Merge multiple CSV quarters into one"""
+    if not csv_data_list:
+        return None
+    
+    merged_dataframes = []
+    
+    for i, csv_data in enumerate(csv_data_list):
+        df = csv_data['dataframe'].copy()
+        
+        # Adjust times
+        df_adjusted = adjust_time_values_csv_merger(df, quarter_offsets[i], time_column)
+        merged_dataframes.append(df_adjusted)
+    
+    # Concatenate all dataframes
+    merged_df = pd.concat(merged_dataframes, ignore_index=True)
+    
+    # Sort by time column if it exists
+    if time_column in merged_df.columns:
+        merged_df = merged_df.sort_values(by=time_column).reset_index(drop=True)
+    
+    return merged_df
+
+def create_csv_download_file_merger(merged_df, filename):
+    """Create downloadable CSV file"""
+    csv_string = merged_df.to_csv(index=False)
+    return csv_string.encode('utf-8')
+
+# JSON Merger Functions
+def parse_json_file_merger(uploaded_file):
+    """Parse uploaded JSON file"""
+    try:
+        content = uploaded_file.read()
+        data = json.loads(content)
+        uploaded_file.seek(0)
+        return data
+    except json.JSONDecodeError as e:
+        st.error(f"Fehler beim Parsen der JSON-Datei {uploaded_file.name}: {e}")
+        return None
+
+def adjust_time_values_json_merger(data, time_offset, time_field='Zeit'):
+    """Adjust time values in JSON data"""
+    adjusted_data = []
+    for item in data:
+        adjusted_item = item.copy()
+        if time_field in adjusted_item:
+            try:
+                adjusted_item[time_field] = float(adjusted_item[time_field]) + time_offset
+            except (ValueError, TypeError):
+                pass  # Skip if not a valid number
+        adjusted_data.append(adjusted_item)
+    return adjusted_data
+
+def merge_json_quarters_merger(json_data_list, quarter_offsets, time_field='Zeit'):
+    """Merge multiple JSON quarters into one"""
+    if not json_data_list:
+        return None
+    
+    merged_data = []
+    
+    for i, json_data in enumerate(json_data_list):
+        data = json_data['data']
+        
+        # Adjust times
+        adjusted_data = adjust_time_values_json_merger(data, quarter_offsets[i], time_field)
+        merged_data.extend(adjusted_data)
+    
+    # Sort by time field if it exists
+    if merged_data and time_field in merged_data[0]:
+        try:
+            merged_data.sort(key=lambda x: float(x.get(time_field, 0)))
+        except (ValueError, TypeError):
+            pass  # Skip sorting if time values are not numeric
+    
+    return merged_data
+
+def create_json_download_file_merger(merged_data, filename):
+    """Create downloadable JSON file"""
+    json_string = json.dumps(merged_data, indent=2, ensure_ascii=False)
+    return json_string.encode('utf-8')
+
+# 5. CSV Merger Tab
+with tabs[4]:
+    st.markdown("## 📊 CSV Merger")
+    st.markdown("Lade mehrere CSV-Dateien von Vierteln hoch und führe sie zu einer zusammen.")
+    
+    # File uploader for CSV files
+    csv_uploaded_files = st.file_uploader(
+        "CSV-Dateien hochladen",
+        type=['csv'],
+        accept_multiple_files=True,
+        key="csv_merger_files"
+    )
+    
+    if csv_uploaded_files:
+        st.success(f"{len(csv_uploaded_files)} CSV-Dateien hochgeladen!")
+        
+        # Quarter start times configuration
+        st.markdown("### ⏰ Viertel-Startzeiten konfigurieren")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        csv_q1_start = col1.number_input("1. Viertel Start (min)", value=0.0, step=0.1, key="csv_q1")
+        csv_q2_start = col2.number_input("2. Viertel Start (min)", value=15.0, step=0.1, key="csv_q2")
+        csv_q3_start = col3.number_input("3. Viertel Start (min)", value=30.0, step=0.1, key="csv_q3")
+        csv_q4_start = col4.number_input("4. Viertel Start (min)", value=45.0, step=0.1, key="csv_q4")
+        
+        csv_quarter_starts = [csv_q1_start, csv_q2_start, csv_q3_start, csv_q4_start]
+        
+        # Time column configuration
+        csv_time_column = st.text_input("Name der Zeit-Spalte", value="Zeit", key="csv_time_col")
+        
+        # Parse CSV files
+        st.markdown("### 📊 Datenvorschau")
+        csv_data_list = []
+        
+        for i, uploaded_file in enumerate(csv_uploaded_files):
+            st.markdown(f"**Datei {i+1}: {uploaded_file.name}**")
+            
+            df = parse_csv_file_merger(uploaded_file)
+            if df is not None:
+                csv_data_list.append({
+                    'filename': uploaded_file.name,
+                    'dataframe': df
+                })
+                
+                # Show preview
+                st.dataframe(df.head(), use_container_width=True)
+                st.markdown(f"📈 **Zeilen:** {len(df)}, **Spalten:** {len(df.columns)}")
+                
+                if csv_time_column in df.columns:
+                    time_range = f"{df[csv_time_column].min():.1f} - {df[csv_time_column].max():.1f}"
+                    st.markdown(f"⏰ **Zeitbereich:** {time_range} Minuten")
+            else:
+                st.error(f"Fehler beim Laden von {uploaded_file.name}")
+        
+        # Merge CSV files
+        if csv_data_list:
+            if st.button("📊 CSV-Dateien zusammenführen", key="merge_csv_btn"):
+                with st.spinner("Führe CSV-Dateien zusammen..."):
+                    # Calculate quarter offsets
+                    csv_quarter_offsets = []
+                    for i in range(len(csv_data_list)):
+                        if i < len(csv_quarter_starts):
+                            csv_quarter_offsets.append(csv_quarter_starts[i])
+                        else:
+                            csv_quarter_offsets.append(0)
+                        
+                    # Merge CSV quarters
+                    merged_csv_df = merge_csv_quarters_merger(csv_data_list, csv_quarter_offsets, csv_time_column)
+                    
+                    if merged_csv_df is not None:
+                        st.success("✅ CSV-Dateien erfolgreich zusammengeführt!")
+                        
+                        # Show merged data preview
+                        st.markdown("### 📊 Zusammengeführte Daten")
+                        st.dataframe(merged_csv_df.head(20), use_container_width=True)
+                        st.markdown(f"📈 **Gesamtzeilen:** {len(merged_csv_df)}")
+                        
+                        if csv_time_column in merged_csv_df.columns:
+                            time_range = f"{merged_csv_df[csv_time_column].min():.1f} - {merged_csv_df[csv_time_column].max():.1f}"
+                            st.markdown(f"⏰ **Gesamtzeitbereich:** {time_range} Minuten")
+                        
+                        # Download button
+                        output_filename = "merged_quarters.csv"
+                        csv_download_data = create_csv_download_file_merger(merged_csv_df, output_filename)
+                        
+                        st.download_button(
+                            label="📥 Zusammengeführte CSV-Datei herunterladen",
+                            data=csv_download_data,
+                            file_name=output_filename,
+                            mime="text/csv",
+                            key="download_merged_csv"
+                        )
+                    else:
+                        st.error("❌ Fehler beim Zusammenführen der CSV-Dateien")
+
+# 6. JSON Merger Tab
+with tabs[5]:
+    st.markdown("## 🔧 JSON Merger")
+    st.markdown("Lade mehrere JSON-Dateien von Vierteln hoch und führe sie zu einer zusammen.")
+    
+    # File uploader for JSON files
+    json_uploaded_files = st.file_uploader(
+        "JSON-Dateien hochladen",
+        type=['json'],
+        accept_multiple_files=True,
+        key="json_merger_files"
+    )
+    
+    if json_uploaded_files:
+        st.success(f"{len(json_uploaded_files)} JSON-Dateien hochgeladen!")
+        
+        # Quarter start times configuration
+        st.markdown("### ⏰ Viertel-Startzeiten konfigurieren")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        json_q1_start = col1.number_input("1. Viertel Start (min)", value=0.0, step=0.1, key="json_q1")
+        json_q2_start = col2.number_input("2. Viertel Start (min)", value=15.0, step=0.1, key="json_q2")
+        json_q3_start = col3.number_input("3. Viertel Start (min)", value=30.0, step=0.1, key="json_q3")
+        json_q4_start = col4.number_input("4. Viertel Start (min)", value=45.0, step=0.1, key="json_q4")
+        
+        json_quarter_starts = [json_q1_start, json_q2_start, json_q3_start, json_q4_start]
+        
+        # Time field configuration
+        json_time_field = st.text_input("Name des Zeit-Feldes", value="Zeit", key="json_time_field")
+        
+        # Parse JSON files
+        st.markdown("### 📊 Datenvorschau")
+        json_data_list = []
+        
+        for i, uploaded_file in enumerate(json_uploaded_files):
+            st.markdown(f"**Datei {i+1}: {uploaded_file.name}**")
+            
+            json_data = parse_json_file_merger(uploaded_file)
+            if json_data is not None:
+                json_data_list.append({
+                    'filename': uploaded_file.name,
+                    'data': json_data
+                })
+                
+                # Show preview
+                if isinstance(json_data, list) and len(json_data) > 0:
+                    preview_data = json_data[:5]  # Show first 5 entries
+                    st.json(preview_data)
+                    st.markdown(f"📈 **Einträge:** {len(json_data)}")
+                    
+                    # Show time range if time field exists
+                    if json_time_field in json_data[0]:
+                        try:
+                            times = [float(item.get(json_time_field, 0)) for item in json_data if json_time_field in item]
+                            if times:
+                                time_range = f"{min(times):.1f} - {max(times):.1f}"
+                                st.markdown(f"⏰ **Zeitbereich:** {time_range} Minuten")
+                        except (ValueError, TypeError):
+                            st.markdown("⚠️ Zeit-Feld enthält nicht-numerische Werte")
+                else:
+                    st.json(json_data)
+            else:
+                st.error(f"Fehler beim Laden von {uploaded_file.name}")
+        
+        # Merge JSON files
+        if json_data_list:
+            if st.button("🔧 JSON-Dateien zusammenführen", key="merge_json_btn"):
+                with st.spinner("Führe JSON-Dateien zusammen..."):
+                    # Calculate quarter offsets
+                    json_quarter_offsets = []
+                    for i in range(len(json_data_list)):
+                        if i < len(json_quarter_starts):
+                            json_quarter_offsets.append(json_quarter_starts[i])
+                        else:
+                            json_quarter_offsets.append(0)
+                        
+                    # Merge JSON quarters
+                    merged_json_data = merge_json_quarters_merger(json_data_list, json_quarter_offsets, json_time_field)
+                    
+                    if merged_json_data is not None:
+                        st.success("✅ JSON-Dateien erfolgreich zusammengeführt!")
+                        
+                        # Show merged data preview
+                        st.markdown("### 📊 Zusammengeführte Daten")
+                        if isinstance(merged_json_data, list) and len(merged_json_data) > 0:
+                            preview_data = merged_json_data[:10]  # Show first 10 entries
+                            st.json(preview_data)
+                            st.markdown(f"📈 **Gesamteinträge:** {len(merged_json_data)}")
+                            
+                            # Show time range if time field exists
+                            if json_time_field in merged_json_data[0]:
+                                try:
+                                    times = [float(item.get(json_time_field, 0)) for item in merged_json_data if json_time_field in item]
+                                    if times:
+                                        time_range = f"{min(times):.1f} - {max(times):.1f}"
+                                        st.markdown(f"⏰ **Gesamtzeitbereich:** {time_range} Minuten")
+                                except (ValueError, TypeError):
+                                    st.markdown("⚠️ Zeit-Feld enthält nicht-numerische Werte")
+                        else:
+                            st.json(merged_json_data)
+                        
+                        # Download button
+                        output_filename = "merged_quarters.json"
+                        json_download_data = create_json_download_file_merger(merged_json_data, output_filename)
+                        
+                        st.download_button(
+                            label="📥 Zusammengeführte JSON-Datei herunterladen",
+                            data=json_download_data,
+                            file_name=output_filename,
+                            mime="application/json",
+                            key="download_merged_json"
+                        )
+                    else:
+                        st.error("❌ Fehler beim Zusammenführen der JSON-Dateien")

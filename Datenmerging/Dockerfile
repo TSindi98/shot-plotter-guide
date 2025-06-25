@@ -14,5 +14,5 @@ COPY . .
 # Exponiere Port 8501 (interner Port für Streamlit)
 EXPOSE 8501
 
-# Starte die Streamlit-Anwendung
+# Starte die Hauptanwendung (integrierte Fußball-Datenanalyse Suite)
 CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
