@@ -15,7 +15,7 @@ services:
       - shot-plotter-network
 
   datenmerging:
-    image: sindi98/shot-plotter-shot-plotter:v1.2
+    image: sindi98/shot-plotter-shot-plotter:v1.3
     container_name: datenmerging
     ports:
       - "8080:8080"
