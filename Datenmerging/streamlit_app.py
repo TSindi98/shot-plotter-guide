@@ -25,6 +25,129 @@ Diese App verarbeitet und integriert Daten aus drei Quellen:
 3. **Playermaker Possession Excel**: Enthält Zeitdaten
 """)
 
+# Position-Mapping-Funktionen
+def extract_unique_players(possession_df):
+    """Extrahiert alle einzigartigen Spielernamen aus der Possession Summary
+    
+    Args:
+        possession_df: DataFrame mit Possession-Daten
+        
+    Returns:
+        list: Liste aller einzigartigen Spielernamen
+    """
+    unique_players = set()
+    
+    # Sammle Spieler aus verschiedenen Spalten
+    player_columns = ['Player Name', 'passed_from', 'passed_to']
+    
+    for col in player_columns:
+        if col in possession_df.columns:
+            # Füge alle nicht-null Werte hinzu
+            players = possession_df[col].dropna().unique()
+            unique_players.update(players)
+    
+    # Entferne leere Strings und None-Werte
+    unique_players = {player for player in unique_players if player and str(player).strip()}
+    
+    return sorted(list(unique_players))
+
+
+def create_position_mapping_interface(unique_players):
+    """Erstellt eine Streamlit-Oberfläche für das Mapping von Spielern zu Positionen
+    
+    Args:
+        unique_players: Liste der einzigartigen Spielernamen
+        
+    Returns:
+        dict: Dictionary mit Spielername -> Position Mapping
+    """
+    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', 'ZM', 'ZOM', 'LF', 'RF', 'ST']
+    
+    st.subheader("Spieler-Position Mapping")
+    st.write(f"Gefundene Spieler: {len(unique_players)}")
+    st.write("Bitte ordnen Sie jedem Spieler eine Position zu:")
+    
+    position_mapping = {}
+    
+    # Erstelle eine Spalten-Layout für bessere Übersicht
+    cols_per_row = 3
+    for i in range(0, len(unique_players), cols_per_row):
+        cols = st.columns(cols_per_row)
+        
+        for j, col in enumerate(cols):
+            if i + j < len(unique_players):
+                player = unique_players[i + j]
+                with col:
+                    # Verwende einen eindeutigen Key für jedes Selectbox
+                    position = st.selectbox(
+                        f"Position für {player}:",
+                        options=['Auswählen...'] + available_positions,
+                        key=f"position_{player}_{i}_{j}"
+                    )
+                    
+                    if position != 'Auswählen...':
+                        position_mapping[player] = position
+    
+    # Zeige eine Übersicht des aktuellen Mappings
+    if position_mapping:
+        st.subheader("Aktuelles Mapping")
+        mapping_df = pd.DataFrame([
+            {'Spieler': player, 'Position': position} 
+            for player, position in position_mapping.items()
+        ])
+        st.dataframe(mapping_df)
+        
+        # Warnung wenn nicht alle Spieler gemappt sind
+        unmapped_players = [p for p in unique_players if p not in position_mapping]
+        if unmapped_players:
+            st.warning(f"Noch nicht gemappte Spieler: {', '.join(unmapped_players)}")
+        else:
+            st.success("Alle Spieler wurden einer Position zugeordnet!")
+    
+    return position_mapping
+
+
+def add_position_to_dataframe(df, position_mapping):
+    """Fügt Position-Information zum DataFrame hinzu basierend auf dem Player Name
+    
+    Args:
+        df: DataFrame mit Spielerdaten
+        position_mapping: Dictionary mit Spielername -> Position Mapping
+        
+    Returns:
+        DataFrame: DataFrame mit hinzugefügter Position-Spalte
+    """
+    # Erstelle eine Kopie des DataFrames
+    result_df = df.copy()
+    
+    # Initialisiere Position-Spalten
+    result_df['Position'] = None
+    result_df['passed_from_Position'] = None
+    result_df['passed_to_Position'] = None
+    
+    # Füge Positionen basierend auf Player Name hinzu
+    if 'Player Name' in result_df.columns:
+        for idx, row in result_df.iterrows():
+            player_name = row['Player Name']
+            if pd.notna(player_name) and player_name in position_mapping:
+                result_df.at[idx, 'Position'] = position_mapping[player_name]
+    
+    # Füge Positionen basierend auf passed_from hinzu
+    if 'passed_from' in result_df.columns:
+        for idx, row in result_df.iterrows():
+            passed_from_player = row['passed_from']
+            if pd.notna(passed_from_player) and passed_from_player in position_mapping:
+                result_df.at[idx, 'passed_from_Position'] = position_mapping[passed_from_player]
+    
+    # Füge Positionen basierend auf passed_to hinzu
+    if 'passed_to' in result_df.columns:
+        for idx, row in result_df.iterrows():
+            passed_to_player = row['passed_to']
+            if pd.notna(passed_to_player) and passed_to_player in position_mapping:
+                result_df.at[idx, 'passed_to_Position'] = position_mapping[passed_to_player]
+    
+    return result_df
+
 # XML Parser aus XML_Parser.py importieren
 @dataclass
 class BallPossessionEvent:
@@ -150,6 +273,10 @@ def process_playermaker_possession(df):
         release_time_col = None
         player_name_col = None
         possession_type_col = None
+        receiving_leg_col = None
+        release_foot_zone_col = None
+        release_velocity_col = None
+        releasing_leg_col = None
         
         # Debug-Info
         st.write("Verfügbare Spalten nach Neuindizierung:", df.columns.tolist())
@@ -170,6 +297,18 @@ def process_playermaker_possession(df):
                 elif "possession type" in col_lower or "possessiontype" in col_lower:
                     possession_type_col = col
                     st.success(f"Gefundene Possession Type Spalte: {col}")
+                elif "receiving leg" in col_lower or "receivingleg" in col_lower:
+                    receiving_leg_col = col
+                    st.success(f"Gefundene Receiving Leg Spalte: {col}")
+                elif "release foot zone" in col_lower or "releasefootzone" in col_lower:
+                    release_foot_zone_col = col
+                    st.success(f"Gefundene Release Foot Zone Spalte: {col}")
+                elif "release velocity" in col_lower and "m/sec" in col_lower:
+                    release_velocity_col = col
+                    st.success(f"Gefundene Release Velocity Spalte: {col}")
+                elif "releasing leg" in col_lower or "releasingleg" in col_lower:
+                    releasing_leg_col = col
+                    st.success(f"Gefundene Releasing Leg Spalte: {col}")
         
         # Wenn die Spalten nicht gefunden wurden, suche nach Spaltenindizes in einer CSV
         if time_col is None or release_time_col is None:
@@ -206,6 +345,18 @@ def process_playermaker_possession(df):
                         elif "possession type" in col_str or "possessiontype" in col_str:
                             possession_type_col = col
                             st.success(f"Gefunden: Possession Type in Spalte {i}: {col}")
+                        elif "receiving leg" in col_str or "receivingleg" in col_str:
+                            receiving_leg_col = col
+                            st.success(f"Gefunden: Receiving Leg in Spalte {i}: {col}")
+                        elif "release foot zone" in col_str or "releasefootzone" in col_str:
+                            release_foot_zone_col = col
+                            st.success(f"Gefunden: Release Foot Zone in Spalte {i}: {col}")
+                        elif "release velocity" in col_str and "m/sec" in col_str:
+                            release_velocity_col = col
+                            st.success(f"Gefunden: Release Velocity in Spalte {i}: {col}")
+                        elif "releasing leg" in col_str or "releasingleg" in col_str:
+                            releasing_leg_col = col
+                            st.success(f"Gefunden: Releasing Leg in Spalte {i}: {col}")
                 except Exception as e:
                     st.error(f"Fehler bei der manuellen Spaltenidentifikation: {str(e)}")
         
@@ -251,7 +402,7 @@ def process_playermaker_possession(df):
         
         # Zeige die ersten Zeilen der bereinigten Daten
         st.write("Erste 3 Zeilen der bereinigten Daten:")
-        display_cols = [col for col in [time_col, release_time_col, player_name_col, possession_type_col] if col is not None]
+        display_cols = [col for col in [time_col, release_time_col, player_name_col, possession_type_col, receiving_leg_col, release_foot_zone_col, release_velocity_col, releasing_leg_col] if col is not None]
         st.write(df[display_cols].head(3))
         
         # Berechnung der Endzeit in Sekunden
@@ -264,6 +415,23 @@ def process_playermaker_possession(df):
         
         if possession_type_col is not None:
             df['Possession Type'] = df[possession_type_col]
+        
+        # Füge die neuen Spalten hinzu
+        if receiving_leg_col is not None:
+            df['Receiving Leg'] = df[receiving_leg_col]
+        
+        if release_foot_zone_col is not None:
+            df['Release Foot Zone'] = df[release_foot_zone_col]
+        
+        if release_velocity_col is not None:
+            df['Release Velocity'] = df[release_velocity_col]
+        
+        if releasing_leg_col is not None:
+            df['Releasing Leg'] = df[releasing_leg_col]
+        
+        # Behalte auch die originale Time to Release Spalte
+        if release_time_col is not None:
+            df['Time to Release'] = df[release_time_col]
         
         # Bereinige leere Strings im finalen DataFrame
         df = clean_empty_strings(df)
@@ -380,10 +548,18 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
     
     Benötigte Spalten im finalen Ergebnis:
     - Name (Player Name aus Possession Summary)
+    - Position (wird durch separates Mapping hinzugefügt)
     - Zeit (korrigierte Zeit aus XML/Possession Summary)
     - Passed from (aus XML)
+    - passed_from_Position (Position des Absenders, durch Mapping hinzugefügt)
     - Passed to (aus XML)
+    - passed_to_Position (Position des Empfängers, durch Mapping hinzugefügt)
     - Possession type (aus Possession Summary)
+    - Receiving Leg (aus Possession Summary)
+    - Release Foot Zone (aus Possession Summary)
+    - Release Velocity (aus Possession Summary)
+    - Releasing Leg (aus Possession Summary)
+    - Time to Release (aus Possession Summary)
     - X, Y Koordinaten (aus CSV/Shot-Plotter)
     - Neue Spalten: Team, Halbzeit, Gegnerdruck, Outcome, Passhöhe, Situation, Aktionstyp, X2, Y2
     """
@@ -598,6 +774,22 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                 if possession_type_col and possession_type_col in best_match and pd.notna(best_match[possession_type_col]):
                     merged_entry['Possession Type'] = best_match[possession_type_col]
                 
+                # Füge die neuen Spalten aus der Possession Summary hinzu
+                if 'Receiving Leg' in best_match and pd.notna(best_match['Receiving Leg']):
+                    merged_entry['Receiving Leg'] = best_match['Receiving Leg']
+                
+                if 'Release Foot Zone' in best_match and pd.notna(best_match['Release Foot Zone']):
+                    merged_entry['Release Foot Zone'] = best_match['Release Foot Zone']
+                
+                if 'Release Velocity' in best_match and pd.notna(best_match['Release Velocity']):
+                    merged_entry['Release Velocity'] = best_match['Release Velocity']
+                
+                if 'Releasing Leg' in best_match and pd.notna(best_match['Releasing Leg']):
+                    merged_entry['Releasing Leg'] = best_match['Releasing Leg']
+                
+                if 'Time to Release' in best_match and pd.notna(best_match['Time to Release']):
+                    merged_entry['Time to Release'] = best_match['Time to Release']
+                
                 merged_data.append(merged_entry)
                 matched_shot_indices.add(idx)
                 matches_found += 1
@@ -630,6 +822,11 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
             unmatched_entry['passed_from'] = None
             unmatched_entry['passed_to'] = None
             unmatched_entry['Possession Type'] = None
+            unmatched_entry['Receiving Leg'] = None
+            unmatched_entry['Release Foot Zone'] = None
+            unmatched_entry['Release Velocity'] = None
+            unmatched_entry['Releasing Leg'] = None
+            unmatched_entry['Time to Release'] = None
             
             merged_data.append(unmatched_entry)
             unmatched_entries += 1
@@ -683,12 +880,12 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                 st.write("Beispiele:", unique_passed_to[:5].tolist())
     
     # Stelle sicher, dass alle gewünschten Spalten vorhanden sind
-    for col in ['Player Name', 'passed_to', 'passed_from', 'Possession Type']:
+    for col in ['Player Name', 'passed_to', 'passed_from', 'Possession Type', 'Receiving Leg', 'Release Foot Zone', 'Release Velocity', 'Releasing Leg', 'Time to Release', 'Position', 'passed_from_Position', 'passed_to_Position']:
         if col not in result_df.columns:
             result_df[col] = None
     
     # Definiere die Reihenfolge der Spalten entsprechend den Anforderungen
-    column_order = ['Player Name', 'Zeit', 'passed_from', 'passed_to', 'Possession Type', 'X', 'Y', 'X2', 'Y2', 'Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp']
+    column_order = ['Player Name', 'Position', 'Zeit', 'passed_from', 'passed_from_Position', 'passed_to', 'passed_to_Position', 'Possession Type', 'Receiving Leg', 'Release Foot Zone', 'Release Velocity', 'Releasing Leg', 'Time to Release', 'X', 'Y', 'X2', 'Y2', 'Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp']
     
     # Füge restliche Spalten hinzu
     for col in result_df.columns:
@@ -786,6 +983,47 @@ def create_sportscode_xml(merged_data, player_col=None, time_window=4.0):
             possession_type_label = ET.SubElement(instance, "label")
             ET.SubElement(possession_type_label, "group").text = "Possession Type"
             ET.SubElement(possession_type_label, "text").text = str(row['Possession Type'])
+        
+        # Neue Spalten aus der Possession Summary als Labels hinzufügen
+        if 'Receiving Leg' in row and pd.notna(row['Receiving Leg']):
+            receiving_leg_label = ET.SubElement(instance, "label")
+            ET.SubElement(receiving_leg_label, "group").text = "Receiving Leg"
+            ET.SubElement(receiving_leg_label, "text").text = str(row['Receiving Leg'])
+        
+        if 'Release Foot Zone' in row and pd.notna(row['Release Foot Zone']):
+            release_foot_zone_label = ET.SubElement(instance, "label")
+            ET.SubElement(release_foot_zone_label, "group").text = "Release Foot Zone"
+            ET.SubElement(release_foot_zone_label, "text").text = str(row['Release Foot Zone'])
+        
+        if 'Release Velocity' in row and pd.notna(row['Release Velocity']):
+            release_velocity_label = ET.SubElement(instance, "label")
+            ET.SubElement(release_velocity_label, "group").text = "Release Velocity"
+            ET.SubElement(release_velocity_label, "text").text = str(row['Release Velocity'])
+        
+        if 'Releasing Leg' in row and pd.notna(row['Releasing Leg']):
+            releasing_leg_label = ET.SubElement(instance, "label")
+            ET.SubElement(releasing_leg_label, "group").text = "Releasing Leg"
+            ET.SubElement(releasing_leg_label, "text").text = str(row['Releasing Leg'])
+        
+        if 'Time to Release' in row and pd.notna(row['Time to Release']):
+            time_to_release_label = ET.SubElement(instance, "label")
+            ET.SubElement(time_to_release_label, "group").text = "Time to Release"
+            ET.SubElement(time_to_release_label, "text").text = str(row['Time to Release'])
+        
+        if 'Position' in row and pd.notna(row['Position']):
+            position_label = ET.SubElement(instance, "label")
+            ET.SubElement(position_label, "group").text = "Position"
+            ET.SubElement(position_label, "text").text = str(row['Position'])
+        
+        if 'passed_from_Position' in row and pd.notna(row['passed_from_Position']):
+            passed_from_position_label = ET.SubElement(instance, "label")
+            ET.SubElement(passed_from_position_label, "group").text = "Passed From Position"
+            ET.SubElement(passed_from_position_label, "text").text = str(row['passed_from_Position'])
+        
+        if 'passed_to_Position' in row and pd.notna(row['passed_to_Position']):
+            passed_to_position_label = ET.SubElement(instance, "label")
+            ET.SubElement(passed_to_position_label, "group").text = "Passed To Position"
+            ET.SubElement(passed_to_position_label, "text").text = str(row['passed_to_Position'])
         
         # Weitere Informationen als Labels
         
@@ -1442,7 +1680,7 @@ with tabs[2]:
         merged_data = st.session_state.merged_data
         
         # Definiere die Hauptspalten, die wir hervorheben wollen
-        main_columns = ['Player Name', 'Zeit', 'passed_from', 'passed_to', 'Possession Type', 'X', 'Y']
+        main_columns = ['Player Name', 'Position', 'Zeit', 'passed_from', 'passed_from_Position', 'passed_to', 'passed_to_Position', 'Possession Type', 'X', 'Y']
         
         # Zeige die Hauptspalten zuerst in der Übersicht
         available_main_columns = [col for col in main_columns if col in merged_data.columns]
@@ -1454,10 +1692,18 @@ with tabs[2]:
         st.write("Hauptspalten in der finalen Tabelle:")
         st.markdown("""
         - **Player Name**: Spielername aus der Possession Summary
+        - **Position**: Spielerposition (TW, RV, LV, LIV, RIV, ZM, ZOM, LF, RF, ST) - durch manuelles Mapping zugeordnet
         - **Zeit**: Korrigierte Zeit aus XML/Possession Summary (synchronisiert mit Video)
         - **passed_from**: Ballabsender aus XML
+        - **passed_from_Position**: Position des Ballabsenders - durch Mapping zugeordnet
         - **passed_to**: Ballempfänger aus XML
+        - **passed_to_Position**: Position des Ballempfängers - durch Mapping zugeordnet
         - **Possession Type**: Art des Ballbesitzes aus der Possession Summary
+        - **Receiving Leg**: Bein zum Empfangen des Balls aus der Possession Summary
+        - **Release Foot Zone**: Zone des Abspielbeins aus der Possession Summary
+        - **Release Velocity**: Geschwindigkeit beim Abspielen (m/sec) aus der Possession Summary
+        - **Releasing Leg**: Bein zum Abspielen des Balls aus der Possession Summary
+        - **Time to Release**: Zeit bis zum Abspielen (Sekunden) aus der Possession Summary
         - **X, Y**: Startkoordinaten aus dem Shot-Plotter (manuelle CSV)
         - **X2, Y2**: Endkoordinaten aus dem Shot-Plotter (manuelle CSV)
         - **Team**: Team-Information aus der CSV
@@ -1471,6 +1717,37 @@ with tabs[2]:
         
         # Anzeigen der zusammengeführten Daten
         st.dataframe(merged_data[display_columns])
+        
+        # Position-Mapping-Sektion
+        st.subheader("Spieler-Position Mapping")
+        st.write("Ordnen Sie jedem Spieler eine Position zu, um diese Information in der finalen Datei zu speichern.")
+        
+        # Extrahiere einzigartige Spieler
+        if st.button("Spieler extrahieren und Position-Mapping starten", key="extract_players_btn"):
+            unique_players = extract_unique_players(merged_data)
+            st.session_state.unique_players = unique_players
+            st.session_state.show_position_mapping = True
+            st.rerun()
+        
+        # Zeige Position-Mapping Interface wenn Spieler extrahiert wurden
+        if st.session_state.get('show_position_mapping', False) and 'unique_players' in st.session_state:
+            position_mapping = create_position_mapping_interface(st.session_state.unique_players)
+            
+            # Speichere das Mapping im session_state
+            st.session_state.position_mapping = position_mapping
+            
+            # Button zum Anwenden des Position-Mappings
+            if position_mapping and len(position_mapping) > 0:
+                if st.button("Position-Mapping anwenden", key="apply_position_mapping_btn"):
+                    # Füge Positionen zum merged_data hinzu
+                    merged_data_with_positions = add_position_to_dataframe(merged_data, position_mapping)
+                    st.session_state.merged_data = merged_data_with_positions
+                    st.session_state.show_position_mapping = False  # Verstecke das Mapping-Interface
+                    st.success(f"Positionen erfolgreich hinzugefügt! {len(position_mapping)} Spieler wurden gemappt.")
+                    st.rerun()
+        
+        # Update merged_data reference after potential position mapping
+        merged_data = st.session_state.merged_data
         
         # Erweiterte Visualisierungen
         st.subheader("Daten-Visualisierung")
@@ -2569,3 +2846,4 @@ with tabs[5]:
                         )
                     else:
                         st.error("❌ Fehler beim Zusammenführen der JSON-Dateien")
+

@@ -4,18 +4,52 @@ Eine umfassende Streamlit-Anwendung für die Analyse und Verarbeitung von Fußba
 
 ## 🚀 Installation & Start
 
-1. **Dependencies installieren:**
+### Option 1: Mit Conda (empfohlen)
+1. **Neue Conda-Umgebung erstellen:**
    ```bash
+   conda create -n shot-plotter python=3.12 -y
+   conda activate shot-plotter
+   ```
+
+2. **Dependencies installieren:**
+   ```bash
+   cd Datenmerging
    pip install -r requirements.txt
    ```
 
-2. **App starten:**
+3. **App starten:**
    ```bash
    streamlit run streamlit_app.py
    ```
 
-3. **Im Browser öffnen:**
-   Die App öffnet sich automatisch unter `http://localhost:8501`
+### Option 2: Mit virtualenv
+1. **Virtuelle Umgebung erstellen:**
+   ```bash
+   cd Datenmerging
+   python -m venv venv
+   source venv/bin/activate  # macOS/Linux
+   # oder: venv\Scripts\activate  # Windows
+   ```
+
+2. **Dependencies installieren:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **App starten:**
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+### Option 3: Global (nicht empfohlen)
+```bash
+cd Datenmerging
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+**🌐 Im Browser öffnen:**
+Die App öffnet sich automatisch unter `http://localhost:8501`
 
 ## 📖 Funktionen
 

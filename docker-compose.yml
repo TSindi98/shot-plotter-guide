@@ -2,8 +2,21 @@ version: '3'
 
 services:
   shot-plotter:
-    image: sindi98/shot-plotter-shot-plotter:v1.2
+    build:
+      context: ./Anleitung
+      dockerfile: Dockerfile
     container_name: shot-plotter
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./Anleitung:/app
+    restart: unless-stopped
+    networks:
+      - shot-plotter-network
+
+  datenmerging:
+    image: sindi98/shot-plotter-shot-plotter:v1.2
+    container_name: datenmerging
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -15,19 +28,6 @@ services:
     container_name: data-merging
     ports:
       - "8000:8000"
-    restart: unless-stopped
-    networks:
-      - shot-plotter-network
-
-  streamlit-guide:
-    build:
-      context: ./Anleitung
-      dockerfile: Dockerfile
-    container_name: streamlit-guide
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./Anleitung:/app
     restart: unless-stopped
     networks:
       - shot-plotter-network
