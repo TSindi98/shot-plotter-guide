@@ -1,9 +1,23 @@
+# ================================================================================
+# FUSSBALL-PASSDATEN INTEGRATION - STREAMLIT APP
+# ================================================================================
+# Diese App verarbeitet und integriert Daten aus drei Quellen:
+# 1. Shot-Plotter CSV (Positionsdaten)
+# 2. Playermaker XML (Passdaten) 
+# 3. Playermaker Possession Excel (Zeitdaten)
+# ================================================================================
+
+# ================================================================================
+# IMPORTS UND KONFIGURATION
+# ================================================================================
 import streamlit as st
 import pandas as pd
 import xml.etree.ElementTree as ET
 import io
 import base64
 import json
+import uuid
+import math
 from datetime import datetime, timedelta
 import os
 from dataclasses import dataclass
@@ -25,7 +39,10 @@ Diese App verarbeitet und integriert Daten aus drei Quellen:
 3. **Playermaker Possession Excel**: Enthält Zeitdaten
 """)
 
-# Position-Mapping-Funktionen
+# ================================================================================
+# POSITION-MAPPING-FUNKTIONEN
+# ================================================================================
+
 def extract_unique_players(possession_df):
     """Extrahiert alle einzigartigen Spielernamen aus der Possession Summary
     
@@ -61,7 +78,7 @@ def create_position_mapping_interface(unique_players):
     Returns:
         dict: Dictionary mit Spielername -> Position Mapping
     """
-    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', 'ZM', 'ZOM', 'LF', 'RF', 'ST']
+    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', '6er', '8er', '10er', 'RM', 'LM', 'LF', 'RF', 'ST']
     
     st.subheader("Spieler-Position Mapping")
     st.write(f"Gefundene Spieler: {len(unique_players)}")
@@ -148,7 +165,10 @@ def add_position_to_dataframe(df, position_mapping):
     
     return result_df
 
-# XML Parser aus XML_Parser.py importieren
+# ================================================================================
+# XML DATA CLASSES UND PARSER
+# ================================================================================
+
 @dataclass
 class BallPossessionEvent:
     event_id: int
@@ -244,6 +264,10 @@ def parse_playermaker_data(xml_file) -> List[BallPossessionEvent]:
     sorted_events = sorted(events, key=lambda x: x.end_time)
     st.write(f"XML nach Zeit sortiert: {len(sorted_events)} Einträge")
     return sorted_events
+
+# ================================================================================
+# DATENVERARBEITUNGSFUNKTIONEN
+# ================================================================================
 
 def process_playermaker_possession(df):
     """Verarbeitet DataFrame aus Playermaker Possession Excel oder CSV und berechnet die Endzeit"""
@@ -469,18 +493,6 @@ def add_passed_to_and_from_column(possession_df, xml_events_df):
     if 'end_time' in xml_events_df.columns:
         xml_events_df['end_time'] = pd.to_numeric(xml_events_df['end_time'], errors='coerce')
     
-    # Zeige Zeitvergleich nur im Debug-Modus
-    if debug_mode and not possession_df.empty and not xml_events_df.empty:
-        st.write("Zeitvergleich (erste 5 Einträge):")
-        comparison_df = pd.DataFrame({
-            'Possession-Endzeit': possession_df['end_time_sec'].head(5).values if 'end_time_sec' in possession_df.columns else ["N/A"] * 5,
-            'XML-Endzeit': xml_events_df['end_time'].head(5).values if 'end_time' in xml_events_df.columns else ["N/A"] * 5
-        })
-        st.write(comparison_df)
-    
-    # Zeitsynchronisierte Zuordnung über end_time_sec
-    if debug_mode:
-        st.write("Verwende die Endzeit für die Zuordnung...")
     
     # Erstelle ein mapping von end_time zu passed_to/from Werten aus XML
     xml_time_to_passes = {}
@@ -512,13 +524,13 @@ def add_passed_to_and_from_column(possession_df, xml_events_df):
             
         end_time = float(row['end_time_sec'])  # Explizite Konvertierung zu float
         
-        # Finde den nächsten Zeitwert in XML mit einer Toleranz von 0.5 Sekunden
+        # Finde den nächsten Zeitwert in XML mit einer Toleranz von 0.1 Sekunden
         best_match = None
         min_diff = float('inf')
         
         for xml_time, passes_list in xml_time_to_passes.items():
             diff = abs(float(xml_time) - end_time)  # Stelle sicher, dass beide Werte float sind
-            if diff < min_diff and diff <= 0.5:
+            if diff < min_diff and diff <= 0.1:
                 min_diff = diff
                 best_match = passes_list[0] if passes_list else None
         
@@ -530,7 +542,7 @@ def add_passed_to_and_from_column(possession_df, xml_events_df):
                 updated_possession_df.at[i, 'passed_from'] = best_match['passed_from']
             if best_match['player'] is not None and ('Player Name' not in updated_possession_df.columns or pd.isna(updated_possession_df.at[i, 'Player Name'])):
                 updated_possession_df.at[i, 'Player Name'] = best_match['player']
-    
+                
     # Anzahl der hinzugefügten Werte anzeigen
     passed_to_count = updated_possession_df['passed_to'].notna().sum() if 'passed_to' in updated_possession_df.columns else 0
     passed_from_count = updated_possession_df['passed_from'].notna().sum() if 'passed_from' in updated_possession_df.columns else 0
@@ -653,62 +665,15 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                         st.warning(f"Verwende Fallback-Spalte als Player Name: {col}")
                     break
     
-    # Debug-Info über die zu vergleichenden Zeiten
-    if 'debug_matching' in st.session_state and st.session_state.get('debug_matching', False):
-        st.subheader("Debug: Zeitvergleich für Matching")
-        st.write("Shot-Plotter Zeiten (die ersten 10):")
-        shot_plotter_times = shot_plotter_df[['Time']].head(10)
-        if 'Original_Time' in shot_plotter_df.columns:
-            shot_plotter_times = shot_plotter_df[['Original_Time', 'Time']].head(10)
-        st.write(shot_plotter_times)
-        
-        st.write("Possession End-Zeiten (die ersten 10):")
-        st.write(possession_df[['end_time_sec']].head(10))
-        
-        st.info(f"Zeitfenster für Matching: {time_window} Sekunden")
-        
-        # Zeige die Zeitdifferenzen für die ersten 5 Einträge
-        if not shot_plotter_df.empty and not possession_df.empty:
-            st.write("Zeitdifferenzen für die ersten 3 Shot-Plotter-Einträge:")
-            for i, shot_row in shot_plotter_df.head(3).iterrows():
-                shot_time = float(shot_row['Time'])
-                st.write(f"Shot-Plotter Zeit: {shot_time:.2f} s")
-                
-                # Berechne alle Zeitdifferenzen
-                time_diffs = pd.DataFrame({
-                    'Possession Zeit': possession_df['end_time_sec'],
-                    'Differenz': (possession_df['end_time_sec'] - shot_time).abs()
-                })
-                
-                # Zeige die 5 nächsten Zeiten
-                closest_times = time_diffs.sort_values('Differenz').head(5)
-                st.write(closest_times)
-                
-                # Zeige, ob ein Match gefunden wurde
-                match_found = any(closest_times['Differenz'] <= time_window)
-                if match_found:
-                    st.success(f"✓ Match gefunden innerhalb von {time_window} Sekunden!")
-                else:
-                    st.error(f"✗ Kein Match innerhalb von {time_window} Sekunden!")
     
     # Merged-DataFrame initialisieren
     merged_data = []
     matches_found = 0
     total_entries = len(shot_plotter_df)
     
-    # Im Debug-Modus mehr Informationen anzeigen
-    if debug_mode:
-        st.write(f"Versuche, {total_entries} Shot-Plotter-Einträge mit {len(possession_df)} Possession-Einträgen zu matchen")
-        st.write(f"Verwendetes Zeitfenster: {time_window} Sekunden")
-        
-        # Zeige die ersten Zeilen beider Dataframes
-        st.write("Erste Zeilen der Shot-Plotter-Daten:")
-        st.write(shot_plotter_df.head(3))
-        st.write("Erste Zeilen der Possession-Daten:")
-        st.write(possession_df.head(3))
-    
-    # Tracking für nicht-gematchte Einträge
-    matched_shot_indices = set()
+    # Tracking für bereits verwendete Possession-Einträge
+    used_possession_indices = set()
+    duplicate_attempts = 0
     
     # Für jeden Eintrag in Shot-Plotter nach übereinstimmenden Zeiten suchen
     for idx, shot_row in shot_plotter_df.iterrows():
@@ -728,179 +693,276 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                 closest_matches['time_diff'] = time_diff_series[time_diff_series <= time_window]
                 closest_matches = closest_matches.sort_values('time_diff')
                 
-                # Wähle den besten Match (den mit der kleinsten Zeitdifferenz)
-                best_match = closest_matches.iloc[0]
+                # Suche nach dem besten verfügbaren Match (noch nicht verwendet)
+                best_match = None
+                best_match_index = None
                 
-                # Erstelle einen kombinierten Eintrag mit den gewünschten Spalten
-                merged_entry = {
-                    # Koordinaten aus Shot-Plotter
-                    'X': shot_row['X'],
-                    'Y': shot_row['Y']
-                }
-                
-                # Füge alle neuen Spalten aus Shot-Plotter hinzu
-                new_columns = ['Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp', 'X2', 'Y2']
-                for col in new_columns:
-                    if col in shot_row and pd.notna(shot_row[col]):
-                        merged_entry[col] = shot_row[col]
-                
-                # Spielername aus Possession Summary
-                if player_name_col and player_name_col in best_match and pd.notna(best_match[player_name_col]):
-                    merged_entry['Player Name'] = best_match[player_name_col]
-                    if debug_mode:
-                        st.write(f"Player Name aus Possession Summary: {best_match[player_name_col]}")
-                else:
-                    # Fallback: Verwende passed_from aus XML als Player Name
-                    if 'passed_from' in best_match and pd.notna(best_match['passed_from']):
-                        merged_entry['Player Name'] = best_match['passed_from']
-                        if debug_mode:
-                            st.write(f"Player Name aus passed_from (XML): {best_match['passed_from']}")
+                for match_idx, match_row in closest_matches.iterrows():
+                    if match_idx not in used_possession_indices:
+                        best_match = match_row
+                        best_match_index = match_idx
+                        break
                     else:
-                        merged_entry['Player Name'] = 'Unbekannter Spieler'
+                        duplicate_attempts += 1
                         if debug_mode:
-                            st.write("Kein Player Name gefunden, verwende 'Unbekannter Spieler'")
+                            st.warning(f"Possession-Eintrag {match_idx} bereits verwendet - überspringe für Shot-Plotter-Zeit {shot_time:.2f}s")
                 
-                # Zeit (korrigierte Zeit aus Possession Summary)
-                merged_entry['Zeit'] = float(best_match['end_time_sec'])  # Explizite float-Konvertierung
-                
-                # Füge passed_from und passed_to aus XML hinzu
-                if 'passed_to' in best_match and pd.notna(best_match['passed_to']):
-                    merged_entry['passed_to'] = best_match['passed_to']
-                
-                if 'passed_from' in best_match and pd.notna(best_match['passed_from']):
-                    merged_entry['passed_from'] = best_match['passed_from']
-                
-                # Possession Type aus Possession Summary
-                if possession_type_col and possession_type_col in best_match and pd.notna(best_match[possession_type_col]):
-                    merged_entry['Possession Type'] = best_match[possession_type_col]
-                
-                # Füge die neuen Spalten aus der Possession Summary hinzu
-                if 'Receiving Leg' in best_match and pd.notna(best_match['Receiving Leg']):
-                    merged_entry['Receiving Leg'] = best_match['Receiving Leg']
-                
-                if 'Release Foot Zone' in best_match and pd.notna(best_match['Release Foot Zone']):
-                    merged_entry['Release Foot Zone'] = best_match['Release Foot Zone']
-                
-                if 'Release Velocity' in best_match and pd.notna(best_match['Release Velocity']):
-                    merged_entry['Release Velocity'] = best_match['Release Velocity']
-                
-                if 'Releasing Leg' in best_match and pd.notna(best_match['Releasing Leg']):
-                    merged_entry['Releasing Leg'] = best_match['Releasing Leg']
-                
-                if 'Time to Release' in best_match and pd.notna(best_match['Time to Release']):
-                    merged_entry['Time to Release'] = best_match['Time to Release']
-                
-                merged_data.append(merged_entry)
-                matched_shot_indices.add(idx)
-                matches_found += 1
+                if best_match is not None and best_match_index is not None:
+                    # Markiere diesen Possession-Eintrag als verwendet
+                    used_possession_indices.add(best_match_index)
+                    
+                    # Erstelle einen kombinierten Eintrag mit den gewünschten Spalten
+                    merged_entry = {
+                        # Koordinaten aus Shot-Plotter
+                        'X': shot_row['X'],
+                        'Y': shot_row['Y']
+                    }
+                    
+                    # Füge alle neuen Spalten aus Shot-Plotter hinzu
+                    new_columns = ['Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp', 'X2', 'Y2']
+                    for col in new_columns:
+                        if col in shot_row and pd.notna(shot_row[col]):
+                            merged_entry[col] = shot_row[col]
+                    
+                    # Spielername aus Possession Summary
+                    if player_name_col and player_name_col in best_match and pd.notna(best_match[player_name_col]):
+                        merged_entry['Player Name'] = best_match[player_name_col]
+                    else:
+                        # Fallback: Verwende passed_from aus XML als Player Name
+                        if 'passed_from' in best_match and pd.notna(best_match['passed_from']):
+                            merged_entry['Player Name'] = best_match['passed_from']
+                        else:
+                            merged_entry['Player Name'] = 'Unbekannter Spieler'
+                    
+                    # Zeit (korrigierte Zeit aus Possession Summary)
+                    merged_entry['Zeit'] = float(best_match['end_time_sec'])  # Explizite float-Konvertierung
+                    
+                    # Füge passed_from und passed_to aus XML hinzu
+                    if 'passed_to' in best_match and pd.notna(best_match['passed_to']):
+                        merged_entry['passed_to'] = best_match['passed_to']
+                    
+                    if 'passed_from' in best_match and pd.notna(best_match['passed_from']):
+                        merged_entry['passed_from'] = best_match['passed_from']
+                    
+                    # Possession Type aus Possession Summary
+                    if possession_type_col and possession_type_col in best_match and pd.notna(best_match[possession_type_col]):
+                        merged_entry['Possession Type'] = best_match[possession_type_col]
+                    
+                    # Füge die neuen Spalten aus der Possession Summary hinzu
+                    if 'Receiving Leg' in best_match and pd.notna(best_match['Receiving Leg']):
+                        merged_entry['Receiving Leg'] = best_match['Receiving Leg']
+                    
+                    if 'Release Foot Zone' in best_match and pd.notna(best_match['Release Foot Zone']):
+                        merged_entry['Release Foot Zone'] = best_match['Release Foot Zone']
+                    
+                    if 'Release Velocity' in best_match and pd.notna(best_match['Release Velocity']):
+                        merged_entry['Release Velocity'] = best_match['Release Velocity']
+                    
+                    if 'Releasing Leg' in best_match and pd.notna(best_match['Releasing Leg']):
+                        merged_entry['Releasing Leg'] = best_match['Releasing Leg']
+                    
+                    if 'Time to Release' in best_match and pd.notna(best_match['Time to Release']):
+                        merged_entry['Time to Release'] = best_match['Time to Release']
+                    
+                    merged_data.append(merged_entry)
+                    matches_found += 1
+                    
+                    if debug_mode:
+                        st.success(f"✅ Match: Shot-Plotter-Zeit {shot_time:.2f}s ↔ Possession-Zeit {best_match['end_time_sec']:.2f}s (Diff: {best_match['time_diff']:.3f}s, Index: {best_match_index})")
+                else:
+                    if debug_mode:
+                        st.warning(f"❌ Kein verfügbarer Match für Shot-Plotter-Zeit {shot_time:.2f}s (alle Kandidaten bereits verwendet)")
             else:
                 # Kein Match gefunden - diesen Eintrag später als unmatched hinzufügen
-                pass
+                if debug_mode:
+                    st.info(f"🔍 Kein Match im Zeitfenster von {time_window}s für Shot-Plotter-Zeit {shot_time:.2f}s")
         except Exception as e:
-            st.error(f"Fehler beim Verarbeiten des Eintrags {idx}: {str(e)}")
+            if debug_mode:
+                st.error(f"Fehler beim Verarbeiten von Shot-Entry {idx}: {str(e)}")
             continue
     
-    # Füge alle nicht-gematchten Shot-Plotter-Einträge hinzu
-    unmatched_entries = 0
-    for idx, shot_row in shot_plotter_df.iterrows():
-        if idx not in matched_shot_indices:
-            # Erstelle Eintrag mit verfügbaren Shot-Plotter-Daten und Platzhaltern für den Rest
-            unmatched_entry = {
-                'X': shot_row['X'], 
-                'Y': shot_row['Y'],
-                'Player Name': 'Unbekannter Spieler',
-                'Zeit': float(shot_row['Time'])  # Verwende die Zeit aus Shot-Plotter
-            }
-            
-            # Füge alle neuen Spalten aus Shot-Plotter hinzu
-            new_columns = ['Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp', 'X2', 'Y2']
-            for col in new_columns:
-                if col in shot_row and pd.notna(shot_row[col]):
-                    unmatched_entry[col] = shot_row[col]
-            
-            # Leere Werte für die anderen Felder
-            unmatched_entry['passed_from'] = None
-            unmatched_entry['passed_to'] = None
-            unmatched_entry['Possession Type'] = None
-            unmatched_entry['Receiving Leg'] = None
-            unmatched_entry['Release Foot Zone'] = None
-            unmatched_entry['Release Velocity'] = None
-            unmatched_entry['Releasing Leg'] = None
-            unmatched_entry['Time to Release'] = None
-            
-            merged_data.append(unmatched_entry)
-            unmatched_entries += 1
-    
-    result_df = pd.DataFrame(merged_data)
-    
-    # Info über Match-Qualität
-    if not result_df.empty:
-        st.info(f"Matches gefunden: {matches_found} von {total_entries} Einträgen ({matches_found/total_entries*100:.1f}%)")
-        if unmatched_entries > 0:
-            st.info(f"Ungematchte Einträge hinzugefügt: {unmatched_entries} (werden mit 'Unbekannter Spieler' angezeigt)")
+    # Zusammenfassung
+    if merged_data:
+        merged_df = pd.DataFrame(merged_data)
+        # Bereinige leere Strings im finalen DataFrame
+        merged_df = clean_empty_strings(merged_df)
         
-        # Anzeigen der gefundenen Spieler-IDs
-        if 'passed_from' in result_df.columns:
-            unique_passed_from = result_df['passed_from'].dropna().unique()
-            st.success(f"Gefundene passed_from Werte: {len(unique_passed_from)}")
-            
-        if 'passed_to' in result_df.columns:
-            unique_passed_to = result_df['passed_to'].dropna().unique()
-            st.success(f"Gefundene passed_to Werte: {len(unique_passed_to)}")
+        success_rate = matches_found/total_entries*100
+        st.success(f"✅ {matches_found} von {total_entries} Einträgen erfolgreich zusammengeführt ({success_rate:.1f}%)")
         
-        # Prüfe, ob Player Name vorhanden ist
-        if 'Player Name' not in result_df.columns or result_df['Player Name'].isnull().all():
-            # Versuche, Player Name aus passed_from zu erstellen, wenn nicht vorhanden
-            if 'passed_from' in result_df.columns:
-                st.warning("Player Name nicht gefunden. Verwende passed_from als Player Name.")
-                result_df['Player Name'] = result_df['passed_from']
+        if duplicate_attempts > 0:
+            st.info(f"🛡️ {duplicate_attempts} Duplicate-Matches verhindert - jeder Possession-Eintrag wird nur einmal verwendet")
         
-        # Debug: Zeige Player Name Statistiken
-        if debug_mode and 'Player Name' in result_df.columns:
-            st.subheader("Debug: Player Name Analyse")
-            unique_players = result_df['Player Name'].dropna().unique()
-            st.write(f"Anzahl eindeutiger Player Names: {len(unique_players)}")
-            st.write("Eindeutige Player Names:")
-            for i, player in enumerate(unique_players[:10]):  # Zeige nur die ersten 10
-                count = (result_df['Player Name'] == player).sum()
-                st.write(f"  {i+1}. '{player}': {count} Einträge")
-            
-            if len(unique_players) > 10:
-                st.write(f"... und {len(unique_players) - 10} weitere")
-            
-            # Zeige auch passed_from und passed_to Werte
-            if 'passed_from' in result_df.columns:
-                unique_passed_from = result_df['passed_from'].dropna().unique()
-                st.write(f"Eindeutige passed_from Werte: {len(unique_passed_from)}")
-                st.write("Beispiele:", unique_passed_from[:5].tolist())
-            
-            if 'passed_to' in result_df.columns:
-                unique_passed_to = result_df['passed_to'].dropna().unique()
-                st.write(f"Eindeutige passed_to Werte: {len(unique_passed_to)}")
-                st.write("Beispiele:", unique_passed_to[:5].tolist())
-    
-    # Stelle sicher, dass alle gewünschten Spalten vorhanden sind
-    for col in ['Player Name', 'passed_to', 'passed_from', 'Possession Type', 'Receiving Leg', 'Release Foot Zone', 'Release Velocity', 'Releasing Leg', 'Time to Release', 'Position', 'passed_from_Position', 'passed_to_Position']:
-        if col not in result_df.columns:
-            result_df[col] = None
-    
-    # Definiere die Reihenfolge der Spalten entsprechend den Anforderungen
-    column_order = ['Player Name', 'Position', 'Zeit', 'passed_from', 'passed_from_Position', 'passed_to', 'passed_to_Position', 'Possession Type', 'Receiving Leg', 'Release Foot Zone', 'Release Velocity', 'Releasing Leg', 'Time to Release', 'X', 'Y', 'X2', 'Y2', 'Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp']
-    
-    # Füge restliche Spalten hinzu
-    for col in result_df.columns:
-        if col not in column_order:
-            column_order.append(col)
-    
-    # Reihenfolge der Spalten anpassen (nur vorhandene Spalten)
-    available_columns = [col for col in column_order if col in result_df.columns]
-    result_df = result_df[available_columns]
-    
-    # Bereinige leere Strings im finalen DataFrame
-    result_df = clean_empty_strings(result_df)
-    
-    return result_df
+        return merged_df
+    else:
+        st.warning("Keine übereinstimmenden Zeiten gefunden. Überprüfen Sie das Zeitfenster oder die Zeitdaten.")
+        return pd.DataFrame()
 
+def synchronize_by_specific_pass(playermaker_df, xml_time, video_time):
+    """
+    Synchronisiert die Zeiten zwischen dem Playermaker-System und der Video-Zeit
+    basierend auf einem manuell angegebenen Pass.
+    
+    Parameters:
+    -----------
+    playermaker_df : DataFrame
+        DataFrame mit den Playermaker-Daten, enthält 'end_time_sec' Spalte
+    xml_time : float
+        Die Zeit des Passes im Playermaker-System (nach -4 Sekunden Korrektur)
+    video_time : float
+        Die entsprechende Zeit des gleichen Passes im Video
+        
+    Returns:
+    --------
+    synchronized_df : DataFrame
+        Kopie des playermaker_df mit synchronisierten Zeiten
+    time_diff : float
+        Berechneter Zeitunterschied zwischen den Systemen
+    """
+    if playermaker_df.empty:
+        st.error("Keine Playermaker-Daten für die Zeitsynchronisation verfügbar.")
+        return playermaker_df, 0.0
+    
+    # Stelle sicher, dass die erforderliche Spalte vorhanden ist
+    if 'end_time_sec' not in playermaker_df.columns:
+        st.error("Playermaker enthält keine 'end_time_sec'-Spalte.")
+        return playermaker_df, 0.0
+    
+    # Stelle sicher, dass alle Zeitwerte numerisch sind
+    playermaker_df['end_time_sec'] = pd.to_numeric(playermaker_df['end_time_sec'], errors='coerce')
+    
+    # Konvertiere Eingabewerte zu float, falls sie es noch nicht sind
+    xml_time = float(xml_time)
+    video_time = float(video_time)
+    
+    # Berechne den Zeitunterschied zwischen der Playermaker-Zeit und der Video-Zeit
+    time_diff = video_time - xml_time
+    
+    # Debug-Info anzeigen
+    st.info("Zeitsynchronisation basierend auf spezifischem Pass:")
+    st.write(f"Pass im Playermaker-System: {xml_time:.2f} s")
+    st.write(f"Gleicher Pass im Video: {video_time:.2f} s")
+    st.write(f"Berechnete Zeitdifferenz: {time_diff:.2f} s")
+    
+    # Kopiere das DataFrame, um das Original nicht zu verändern
+    synchronized_df = playermaker_df.copy()
+    
+    # Passe die Zeiten im Playermaker DataFrame an
+    synchronized_df['original_end_time_sec'] = synchronized_df['end_time_sec']  # Original speichern
+    synchronized_df['end_time_sec'] = synchronized_df['end_time_sec'] + time_diff
+    
+    if 'start_time_sec' in synchronized_df.columns:
+        synchronized_df['start_time_sec'] = pd.to_numeric(synchronized_df['start_time_sec'], errors='coerce')
+        synchronized_df['original_start_time_sec'] = synchronized_df['start_time_sec']  # Original speichern
+        synchronized_df['start_time_sec'] = synchronized_df['start_time_sec'] + time_diff
+    
+    # Zeige die ersten 5 synchronisierten Einträge
+    st.write("Synchronisierte Zeitwerte (erste 5 Einträge):")
+    time_columns = ['original_end_time_sec', 'end_time_sec']
+    if 'start_time_sec' in synchronized_df.columns:
+        time_columns.extend(['original_start_time_sec', 'start_time_sec'])
+    
+    st.write(synchronized_df[time_columns].head())
+    
+    return synchronized_df, time_diff
+
+def convert_time_to_seconds(time_str):
+    """
+    Konvertiert Zeit im Format MM:SS.HH oder MM:SS:HH zu Sekunden
+    
+    Parameters:
+    -----------
+    time_str : str
+        Zeit im Format "MM:SS.HH" oder "MM:SS:HH"
+        
+    Returns:
+    --------
+    float
+        Zeit in Sekunden
+    """
+    # Überprüfe, ob die Zeit bereits eine Zahl ist
+    if isinstance(time_str, (int, float)):
+        return float(time_str)
+    
+    # Wenn die Zeit eine Zeichenkette ist
+    if isinstance(time_str, str):
+        # Bereinigen und normalisieren
+        time_str = time_str.strip()
+        
+        try:
+            # Falls es bereits ein einfacher Float-String ist (z.B. "123.45")
+            if time_str.replace('.', '', 1).isdigit():
+                return float(time_str)
+            
+            # Format MM:SS.HH (wie in der CSV: "0:00.00", "1:03.64")
+            if ':' in time_str:
+                parts = time_str.split(':')
+                if len(parts) == 2:  # Format ist MM:SS.HH
+                    minutes = int(parts[0])
+                    # Behandle den Sekundenteil
+                    if '.' in parts[1]:
+                        seconds_parts = parts[1].split('.')
+                        seconds = int(seconds_parts[0])
+                        hundredths = int(seconds_parts[1]) if len(seconds_parts) > 1 else 0
+                        return minutes * 60 + seconds + hundredths / 100
+                    elif ',' in parts[1]:
+                        seconds_parts = parts[1].split(',')
+                        seconds = int(seconds_parts[0])
+                        hundredths = int(seconds_parts[1]) if len(seconds_parts) > 1 else 0
+                        return minutes * 60 + seconds + hundredths / 100
+                    else:
+                        return minutes * 60 + float(parts[1])
+                elif len(parts) == 3:  # Format ist MM:SS:HH
+                    minutes = int(parts[0])
+                    seconds = int(parts[1])
+                    hundredths = int(parts[2])
+                    return minutes * 60 + seconds + hundredths / 100
+            
+            # Fallback: Versuche direkte Konvertierung (könnte fehlschlagen)
+            return float(time_str)
+        except (ValueError, IndexError) as e:
+            st.error(f"Fehler bei der Zeitkonvertierung für '{time_str}': {str(e)}")
+            return 0.0
+    
+    # Wenn kein gültiges Format
+    st.error(f"Ungültiges Zeitformat: {time_str}")
+    return 0.0
+
+def clean_empty_strings(df):
+    """Konvertiert leere Strings zu NaN-Werten"""
+    # Kopie des DataFrames erstellen
+    df_cleaned = df.copy()
+    
+    # Für alle Spalten: leere Strings zu NaN konvertieren
+    for col in df_cleaned.columns:
+        if df_cleaned[col].dtype == 'object':  # Nur für String-Spalten
+            # Ersetze leere Strings und Whitespace-Strings mit NaN
+            df_cleaned[col] = df_cleaned[col].replace(['', ' ', '  ', '\t', '\n'], np.nan)
+    
+    return df_cleaned
+
+def fix_column_names(df):
+    """Korrigiert Spaltennamen, die durch Kodierungsprobleme beschädigt wurden"""
+    column_mapping = {
+        'Passhˆhe': 'Passhöhe',
+        'PasshÃ¶he': 'Passhöhe',
+        'PasshÃ¶he': 'Passhöhe',
+        'Anstoﬂ': 'Anstoß',
+        'AnstoÃŸ': 'Anstoß',
+        'AnstoÃ': 'Anstoß'
+    }
+    
+    # Korrigiere Spaltennamen
+    corrected_columns = []
+    for col in df.columns:
+        if col in column_mapping:
+            corrected_columns.append(column_mapping[col])
+            st.info(f"Spaltenname korrigiert: '{col}' -> '{column_mapping[col]}'")
+        else:
+            corrected_columns.append(col)
+    
+    df.columns = corrected_columns
+    return df
 def create_sportscode_xml(merged_data, player_col=None, time_window=4.0):
     """Erzeugt eine Sportscode-kompatible XML-Datei aus den zusammengeführten Daten
     
@@ -1079,171 +1141,933 @@ def create_sportscode_xml(merged_data, player_col=None, time_window=4.0):
     # XML als String zurückgeben
     return ET.tostring(root, encoding='unicode')
 
-def synchronize_by_specific_pass(playermaker_df, xml_time, video_time):
-    """
-    Synchronisiert die Zeiten zwischen dem Playermaker-System und der Video-Zeit
-    basierend auf einem manuell angegebenen Pass.
-    
-    Parameters:
-    -----------
-    playermaker_df : DataFrame
-        DataFrame mit den Playermaker-Daten, enthält 'end_time_sec' Spalte
-    xml_time : float
-        Die Zeit des Passes im Playermaker-System (nach -4 Sekunden Korrektur)
-    video_time : float
-        Die entsprechende Zeit des gleichen Passes im Video
-        
-    Returns:
-    --------
-    synchronized_df : DataFrame
-        Kopie des playermaker_df mit synchronisierten Zeiten
-    time_diff : float
-        Berechneter Zeitunterschied zwischen den Systemen
-    """
-    if playermaker_df.empty:
-        st.error("Keine Playermaker-Daten für die Zeitsynchronisation verfügbar.")
-        return playermaker_df, 0.0
-    
-    # Stelle sicher, dass die erforderliche Spalte vorhanden ist
-    if 'end_time_sec' not in playermaker_df.columns:
-        st.error("Playermaker enthält keine 'end_time_sec'-Spalte.")
-        return playermaker_df, 0.0
-    
-    # Stelle sicher, dass alle Zeitwerte numerisch sind
-    playermaker_df['end_time_sec'] = pd.to_numeric(playermaker_df['end_time_sec'], errors='coerce')
-    
-    # Konvertiere Eingabewerte zu float, falls sie es noch nicht sind
-    xml_time = float(xml_time)
-    video_time = float(video_time)
-    
-    # Berechne den Zeitunterschied zwischen der Playermaker-Zeit und der Video-Zeit
-    time_diff = video_time - xml_time
-    
-    # Debug-Info anzeigen
-    st.info("Zeitsynchronisation basierend auf spezifischem Pass:")
-    st.write(f"Pass im Playermaker-System: {xml_time:.2f} s")
-    st.write(f"Gleicher Pass im Video: {video_time:.2f} s")
-    st.write(f"Berechnete Zeitdifferenz: {time_diff:.2f} s")
-    
-    # Kopiere das DataFrame, um das Original nicht zu verändern
-    synchronized_df = playermaker_df.copy()
-    
-    # Passe die Zeiten im Playermaker DataFrame an
-    synchronized_df['original_end_time_sec'] = synchronized_df['end_time_sec']  # Original speichern
-    synchronized_df['end_time_sec'] = synchronized_df['end_time_sec'] + time_diff
-    
-    if 'start_time_sec' in synchronized_df.columns:
-        synchronized_df['start_time_sec'] = pd.to_numeric(synchronized_df['start_time_sec'], errors='coerce')
-        synchronized_df['original_start_time_sec'] = synchronized_df['start_time_sec']  # Original speichern
-        synchronized_df['start_time_sec'] = synchronized_df['start_time_sec'] + time_diff
-    
-    # Zeige die ersten 5 synchronisierten Einträge
-    st.write("Synchronisierte Zeitwerte (erste 5 Einträge):")
-    time_columns = ['original_end_time_sec', 'end_time_sec']
-    if 'start_time_sec' in synchronized_df.columns:
-        time_columns.extend(['original_start_time_sec', 'start_time_sec'])
-    
-    st.write(synchronized_df[time_columns].head())
-    
-    return synchronized_df, time_diff
 
-def convert_time_to_seconds(time_str):
+def load_player_database():
     """
-    Konvertiert Zeit im Format MM:SS.HH oder MM:SS:HH zu Sekunden
-    
-    Parameters:
-    -----------
-    time_str : str
-        Zeit im Format "MM:SS.HH" oder "MM:SS:HH"
-        
-    Returns:
-    --------
-    float
-        Zeit in Sekunden
+    Lädt die Spieler-Datenbank aus einer lokalen JSON-Datei.
+    Erstellt eine neue Datei, wenn sie nicht existiert.
     """
-    # Überprüfe, ob die Zeit bereits eine Zahl ist
-    if isinstance(time_str, (int, float)):
-        return float(time_str)
+    import os
+    import json
     
-    # Wenn die Zeit eine Zeichenkette ist
-    if isinstance(time_str, str):
-        # Bereinigen und normalisieren
-        time_str = time_str.strip()
-        
+    db_path = "players_database.json"
+    
+    if os.path.exists(db_path):
         try:
-            # Falls es bereits ein einfacher Float-String ist (z.B. "123.45")
-            if time_str.replace('.', '', 1).isdigit():
-                return float(time_str)
-            
-            # Format MM:SS.HH (wie in der CSV: "0:00.00", "1:03.64")
-            if ':' in time_str:
-                parts = time_str.split(':')
-                if len(parts) == 2:  # Format ist MM:SS.HH
-                    minutes = int(parts[0])
-                    # Behandle den Sekundenteil
-                    if '.' in parts[1]:
-                        seconds_parts = parts[1].split('.')
-                        seconds = int(seconds_parts[0])
-                        hundredths = int(seconds_parts[1]) if len(seconds_parts) > 1 else 0
-                        return minutes * 60 + seconds + hundredths / 100
-                    elif ',' in parts[1]:
-                        seconds_parts = parts[1].split(',')
-                        seconds = int(seconds_parts[0])
-                        hundredths = int(seconds_parts[1]) if len(seconds_parts) > 1 else 0
-                        return minutes * 60 + seconds + hundredths / 100
-                    else:
-                        return minutes * 60 + float(parts[1])
-                elif len(parts) == 3:  # Format ist MM:SS:HH
-                    minutes = int(parts[0])
-                    seconds = int(parts[1])
-                    hundredths = int(parts[2])
-                    return minutes * 60 + seconds + hundredths / 100
-            
-            # Fallback: Versuche direkte Konvertierung (könnte fehlschlagen)
-            return float(time_str)
-        except (ValueError, IndexError) as e:
-            st.error(f"Fehler bei der Zeitkonvertierung für '{time_str}': {str(e)}")
-            return 0.0
+            with open(db_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            st.warning("Spieler-Datenbank konnte nicht geladen werden. Erstelle neue Datenbank.")
     
-    # Wenn kein gültiges Format
-    st.error(f"Ungültiges Zeitformat: {time_str}")
-    return 0.0
+    # Standard-Struktur für neue Datenbank
+    return {
+        "players": {},
+        "next_player_id": 1,
+        "metadata": {
+            "created": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat(),
+            "total_players": 0
+        }
+    }
 
-def clean_empty_strings(df):
-    """Konvertiert leere Strings zu NaN-Werten"""
-    # Kopie des DataFrames erstellen
-    df_cleaned = df.copy()
+def save_player_database(player_db):
+    """
+    Speichert die Spieler-Datenbank in eine lokale JSON-Datei.
+    """
+    import json
+    from datetime import datetime
     
-    # Für alle Spalten: leere Strings zu NaN konvertieren
-    for col in df_cleaned.columns:
-        if df_cleaned[col].dtype == 'object':  # Nur für String-Spalten
-            # Ersetze leere Strings und Whitespace-Strings mit NaN
-            df_cleaned[col] = df_cleaned[col].replace(['', ' ', '  ', '\t', '\n'], np.nan)
+    db_path = "players_database.json"
     
-    return df_cleaned
+    # Aktualisiere Metadaten
+    player_db["metadata"]["last_updated"] = datetime.now().isoformat()
+    player_db["metadata"]["total_players"] = len(player_db["players"])
+    
+    try:
+        with open(db_path, 'w', encoding='utf-8') as f:
+            json.dump(player_db, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        st.error(f"Fehler beim Speichern der Spieler-Datenbank: {str(e)}")
+        return False
 
-def fix_column_names(df):
-    """Korrigiert Spaltennamen, die durch Kodierungsprobleme beschädigt wurden"""
-    column_mapping = {
-        'Passhˆhe': 'Passhöhe',
-        'PasshÃ¶he': 'Passhöhe',
-        'PasshÃ¶he': 'Passhöhe',
-        'Anstoﬂ': 'Anstoß',
-        'AnstoÃŸ': 'Anstoß',
-        'AnstoÃ': 'Anstoß'
+def get_or_create_player_id(player_name, player_db):
+    """
+    Gibt die bestehende Player-ID zurück oder erstellt eine neue für den Spieler.
+    """
+    if not player_name or pd.isna(player_name) or str(player_name).strip() == "":
+        return None
+    
+    player_name = str(player_name).strip()
+    
+    # Suche nach existierendem Spieler (case-insensitive)
+    for existing_name, player_info in player_db["players"].items():
+        if existing_name.lower() == player_name.lower():
+            return player_info["player_id"]
+    
+    # Erstelle neue Player-ID mit 5 Stellen
+    new_player_id = f"BVB_{player_db['next_player_id']:05d}"
+    
+    player_db["players"][player_name] = {
+        "player_id": new_player_id,
+        "display_name": player_name,
+        "created": datetime.now().isoformat(),
+        "matches_played": []
     }
     
-    # Korrigiere Spaltennamen
-    corrected_columns = []
-    for col in df.columns:
-        if col in column_mapping:
-            corrected_columns.append(column_mapping[col])
-            st.info(f"Spaltenname korrigiert: '{col}' -> '{column_mapping[col]}'")
-        else:
-            corrected_columns.append(col)
+    player_db["next_player_id"] += 1
     
-    df.columns = corrected_columns
-    return df
+    return new_player_id
+
+def load_match_database():
+    """
+    Lädt die Match-Datenbank aus einer lokalen JSON-Datei.
+    """
+    import os
+    import json
+    
+    db_path = "match_database.json"
+    
+    if os.path.exists(db_path):
+        try:
+            with open(db_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            st.warning("Match-Datenbank konnte nicht geladen werden. Erstelle neue Datenbank.")
+    
+    return {
+        "matches": {},
+        "next_match_id": 1,
+        "metadata": {
+            "created": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat(),
+            "total_matches": 0
+        }
+    }
+
+def save_match_database(match_db):
+    """
+    Speichert die Match-Datenbank in eine lokale JSON-Datei.
+    """
+    import json
+    from datetime import datetime
+    
+    db_path = "match_database.json"
+    
+    # Aktualisiere Metadaten
+    match_db["metadata"]["last_updated"] = datetime.now().isoformat()
+    match_db["metadata"]["total_matches"] = len(match_db["matches"])
+    
+    try:
+        with open(db_path, 'w', encoding='utf-8') as f:
+            json.dump(match_db, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        st.error(f"Fehler beim Speichern der Match-Datenbank: {str(e)}")
+        return False
+
+def extract_match_info_from_possession(possession_df):
+    """
+    Extrahiert Match-Informationen aus den Possession-Daten.
+    """
+    import re
+    from datetime import datetime
+    
+    match_info = {
+        'date': None,
+        'team': None,
+        'youth_level': None,
+        'opponent': None,
+        'venue': 'Unknown'
+    }
+    
+    if possession_df is None or possession_df.empty:
+        return match_info
+    
+    # Suche nach Datum in verschiedenen Spalten
+    date_columns = ['Date', 'Datum', 'date', 'Match Date', 'Spieltag']
+    for col in date_columns:
+        if col in possession_df.columns:
+            date_values = possession_df[col].dropna().unique()
+            if len(date_values) > 0:
+                try:
+                    # Versuche verschiedene Datumsformate zu parsen
+                    date_str = str(date_values[0])
+                    
+                    # Deutsche Formate: dd.mm.yyyy, dd.mm.yy
+                    if re.match(r'\d{1,2}\.\d{1,2}\.\d{2,4}', date_str):
+                        parts = date_str.split('.')
+                        if len(parts[2]) == 2:  # 2-stelliges Jahr
+                            parts[2] = '20' + parts[2]
+                        match_info['date'] = f"{parts[2]}-{parts[1]:0>2}-{parts[0]:0>2}"
+                    
+                    # ISO Format: yyyy-mm-dd
+                    elif re.match(r'\d{4}-\d{1,2}-\d{1,2}', date_str):
+                        match_info['date'] = date_str
+                    
+                    # Amerikanisches Format: mm/dd/yyyy
+                    elif re.match(r'\d{1,2}/\d{1,2}/\d{4}', date_str):
+                        parts = date_str.split('/')
+                        match_info['date'] = f"{parts[2]}-{parts[0]:0>2}-{parts[1]:0>2}"
+                        
+                except Exception:
+                    continue
+                    
+                if match_info['date']:
+                    break
+    
+    # Suche nach Team/Jugend-Informationen
+    team_columns = ['Team', 'Mannschaft', 'Squad', 'team']
+    for col in team_columns:
+        if col in possession_df.columns:
+            team_values = possession_df[col].dropna().unique()
+            if len(team_values) > 0:
+                team_str = str(team_values[0]).lower()
+                
+                # Erkenne Jugendmannschaften
+                youth_patterns = {
+                    'u19': r'u-?19|unter.?19|19er',
+                    'u17': r'u-?17|unter.?17|17er',
+                    'u16': r'u-?16|unter.?16|16er',
+                    'u15': r'u-?15|unter.?15|15er',
+                    'u14': r'u-?14|unter.?14|14er',
+                    'u13': r'u-?13|unter.?13|13er',
+                    'u12': r'u-?12|unter.?12|12er',
+                    'u11': r'u-?11|unter.?11|11er',
+                    'u10': r'u-?10|unter.?10|10er',
+                    'u9': r'u-?9|unter.?9|9er',
+                    'u8': r'u-?8|unter.?8|8er',
+                    'u7': r'u-?7|unter.?7|7er'
+                }
+                
+                for youth, pattern in youth_patterns.items():
+                    if re.search(pattern, team_str):
+                        match_info['youth_level'] = youth.upper() if youth else None
+                        break
+                
+                # Team-Name extrahieren (BVB, Borussia Dortmund, etc.)
+                if 'bvb' in team_str or 'dortmund' in team_str or 'borussia' in team_str:
+                    match_info['team'] = 'BVB'
+                else:
+                    match_info['team'] = team_values[0]
+                break
+    
+    # Suche nach Gegner-Informationen in verschiedenen Spalten
+    opponent_columns = ['Opponent', 'Gegner', 'vs', 'Against', 'opponent']
+    for col in opponent_columns:
+        if col in possession_df.columns:
+            opponent_values = possession_df[col].dropna().unique()
+            if len(opponent_values) > 0:
+                match_info['opponent'] = str(opponent_values[0])
+                break
+    
+    return match_info
+
+def create_or_get_match_id(match_info, match_db):
+    """
+    Erstellt eine neue Match-ID oder gibt eine bestehende zurück.
+    Priorität: XML-Daten > Possession-Daten > CSV-Dateiname
+    """
+    from datetime import datetime
+    import re
+    
+    extracted_info = None
+    data_source = "unknown"
+    
+    # 1. Priorität: XML-Daten (am zuverlässigsten)
+    if 'xml_data' in match_info:
+        st.info("🔍 Extrahiere Match-Informationen aus XML-Daten...")
+        extracted_info = extract_match_info_from_xml(match_info['xml_data'])
+        data_source = "xml_session_info"
+        
+        if extracted_info and (extracted_info.get('date') or extracted_info.get('youth_level')):
+            opponent_info = f" gegen {extracted_info.get('opponent', 'UNKNOWN')}" if extracted_info.get('opponent') else ""
+            st.success(f"✅ XML-Daten erfolgreich extrahiert: {extracted_info.get('youth_level', 'N/A')} am {extracted_info.get('date', 'N/A')}{opponent_info}")
+    
+    # 2. Fallback: Possession-Daten
+    elif 'possession_data' in match_info:
+        st.info("📊 Extrahiere Match-Informationen aus Possession-Daten...")
+        extracted_info = extract_match_info_from_possession(match_info['possession_data'])
+        data_source = "possession_summary"
+    
+    # Wenn wir extrahierte Informationen haben, verwende diese
+    if extracted_info:
+        match_date = extracted_info.get('date')
+        youth_level = extracted_info.get('youth_level', 'SENIOR')
+        team = extracted_info.get('team', 'BVB')
+        opponent = extracted_info.get('opponent')
+        
+        # Falls kein Gegner gefunden wurde, verwende Fallback
+        if not opponent:
+            opponent = 'UNKNOWN'
+            st.info("ℹ️ Kein Gegner in den Daten gefunden - verwende 'UNKNOWN'")
+        
+        # Erstelle strukturierte Match-ID
+        if match_date:
+            # Format: YOUTH_TEAM-OPPONENT_DATE
+            # Beispiel: U12_BVB-BMG_2023-11-04
+            
+            # Bereinige Namen für Dateisystem - mit Null-Checks
+            clean_team = re.sub(r'[^\w]', '', (team or 'BVB').upper())
+            clean_opponent = re.sub(r'[^\w]', '', (opponent or 'UNKNOWN').upper().replace(' ', ''))[:10]  # Max 10 Zeichen
+            
+            if youth_level and youth_level != 'SENIOR':
+                match_identifier = f"{youth_level}_{clean_team}-{clean_opponent}_{match_date}"
+            else:
+                match_identifier = f"{clean_team}-{clean_opponent}_{match_date}"
+        else:
+            # Fallback ohne Datum
+            today = datetime.now().strftime('%Y-%m-%d')
+            clean_team = re.sub(r'[^\w]', '', (team or 'BVB').upper())
+            match_identifier = f"{youth_level or 'SENIOR'}_{clean_team}-TRAINING_{today}"
+    
+    else:
+        # 3. Fallback für alte CSV-basierte Methode
+        csv_filename = match_info.get('csv_filename', '')
+        data_source = "csv_filename"
+        
+        if csv_filename:
+            base_name = csv_filename.replace('.csv', '').replace('.CSV', '')
+            match_identifier = re.sub(r'_\d+_\d+$', '', base_name)
+            if not match_identifier:
+                match_identifier = base_name
+        else:
+            today = datetime.now().strftime("%Y-%m-%d")
+            match_identifier = f"{match_info.get('type', 'training')}_{today}"
+    
+    # Prüfe, ob bereits ein Match mit diesem Identifier existiert
+    for match_id, match_data in match_db["matches"].items():
+        if match_data.get("identifier") == match_identifier:
+            return match_id
+    
+    # Erstelle neue Match-ID basierend auf dem Identifier
+    safe_identifier = re.sub(r'[^\w\-_.]', '_', match_identifier)
+    new_match_id = safe_identifier
+    
+    # Prüfe, ob diese ID bereits existiert
+    counter = 1
+    original_id = new_match_id
+    while new_match_id in match_db["matches"]:
+        new_match_id = f"{original_id}_{counter}"
+        counter += 1
+    
+    # Erstelle Match-Eintrag mit erweiterten Informationen
+    match_entry = {
+        "match_id": new_match_id,
+        "identifier": match_identifier,
+        "date": datetime.now().isoformat(),
+        "type": match_info.get('type', 'match'),
+        "venue": match_info.get('venue', 'BVB Training Ground'),
+        "created": datetime.now().isoformat(),
+        "players": [],
+        "data_source": data_source
+    }
+    
+    # Füge extrahierte Informationen hinzu falls verfügbar
+    if extracted_info:
+        match_entry.update({
+            "match_date": extracted_info.get('date'),
+            "youth_level": extracted_info.get('youth_level'),
+            "team": extracted_info.get('team', 'BVB'),
+            "opponent": opponent if 'opponent' in locals() else extracted_info.get('opponent')
+        })
+    else:
+        match_entry.update({
+            "original_filename": match_info.get('csv_filename', '')
+        })
+    
+    match_db["matches"][new_match_id] = match_entry
+    match_db["next_match_id"] += 1
+    
+    return new_match_id
+
+
+def generate_consistent_event_id(timestamp, youth_level="U12"):
+    """
+    Generiert eine konsistente Event-ID basierend auf Youth-Level und Zeitstempel.
+    Format: YOUTH_timestamp (z.B. U12_125.67, U17_89.23)
+    
+    Args:
+        timestamp: Der Zeitstempel des Events (float)
+        youth_level: Das Youth-Level (z.B. "U12", "U17", "SENIOR")
+    
+    Returns:
+        str: Konsistente Event-ID im Format "YOUTH_timestamp"
+    """
+    # Bereinige Youth-Level falls nötig
+    if not youth_level or youth_level == "Unknown":
+        youth_level = "U12"
+    
+    # Stelle sicher dass Youth-Level korrekt formatiert ist
+    if not youth_level.startswith(('U', 'SENIOR')):
+        youth_level = f"U{youth_level}" if youth_level.isdigit() else "U12"
+    
+    # Formatiere Zeitstempel mit 2 Dezimalstellen
+    timestamp_str = f"{float(timestamp):.5f}"
+    
+    return f"{youth_level}_{timestamp_str}"
+
+def extract_youth_level_from_match_info(match_info):
+    """
+    Extrahiert das Youth-Level aus Match-Informationen.
+    
+    Args:
+        match_info: Dictionary mit Match-Informationen
+    
+    Returns:
+        str: Youth-Level (z.B. "U12", "U17", "SENIOR")
+    """
+    youth_level = match_info.get('youth_level', '')
+    
+    # Fallback-Mechanismen
+    if not youth_level or youth_level == "Unknown":
+        # Versuche aus anderen Feldern zu extrahieren
+        team = match_info.get('team', '')
+        if 'U12' in team:
+            youth_level = 'U12'
+        elif 'U13' in team:
+            youth_level = 'U13'
+        elif 'U14' in team:
+            youth_level = 'U14'
+        elif 'U15' in team:
+            youth_level = 'U15'
+        elif 'U16' in team:
+            youth_level = 'U16'
+        elif 'U17' in team:
+            youth_level = 'U17'
+        elif 'U19' in team:
+            youth_level = 'U19'
+        else:
+            youth_level = 'U12'  # Default
+    
+    return youth_level
+
+def create_structured_json_export_with_ids(df):
+    """
+    Erweiterte Version der strukturierten JSON-Export-Funktion mit konsistenten IDs.
+    """
+    import uuid
+    import json
+    from datetime import datetime
+    
+    # Lade Datenbanken
+    player_db = load_player_database()
+    match_db = load_match_database()
+    
+    # Versuche verschiedene Datenquellen zu finden (Priorität: XML > Possession > CSV)
+    xml_data = None
+    possession_data = None
+    csv_filename = ""
+    
+    # 1. Priorität: XML-Daten (am zuverlässigsten)
+    if 'xml_file' in st.session_state and st.session_state.xml_file is not None:
+        xml_data = st.session_state.xml_file
+        st.info("🎯 Verwende XML-Daten für Match-Informationen (höchste Priorität)")
+    
+    # 2. Fallback: Possession-Daten
+    elif 'possession_df' in st.session_state and not st.session_state.possession_df.empty:
+        possession_data = st.session_state.possession_df
+        st.info("📊 Verwende Possession-Daten für Match-Informationen")
+    
+    # 3. Fallback: CSV-Dateiname
+    if 'shot_plotter_file' in st.session_state:
+        csv_filename = st.session_state.shot_plotter_file.name
+    
+    # Zeige extrahierte Informationen basierend auf verfügbaren Daten
+    extracted_info = None
+    if xml_data:
+        extracted_info = extract_match_info_from_xml(xml_data)
+        data_source_display = "XML SESSION_INFO"
+    elif possession_data:
+        extracted_info = extract_match_info_from_possession(possession_data)
+        data_source_display = "Possession Summary"
+    
+    if extracted_info and (extracted_info['date'] or extracted_info['team'] or extracted_info['youth_level']):
+        with st.expander(f"🔍 Extrahierte Match-Informationen ({data_source_display})", expanded=True):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Datum", extracted_info.get('date', 'Nicht gefunden'))
+            with col2:
+                st.metric("Jugend", extracted_info.get('youth_level', 'Nicht erkannt'))
+            with col3:
+                st.metric("Team", extracted_info.get('team', 'Nicht erkannt'))
+            
+            if extracted_info.get('opponent'):
+                st.success(f"🆚 Gegner in Daten gefunden: **{extracted_info['opponent']}**")
+            else:
+                st.info("ℹ️ Kein Gegner in den Daten gefunden - verwende 'UNKNOWN'")
+    else:
+        st.warning("⚠️ Keine verwertbaren Match-Informationen gefunden - verwende Fallback")
+    
+    # Erstelle oder hole Match-ID basierend auf verfügbaren Daten
+    match_info = {
+        'type': 'match',  # Jetzt als Match kategorisiert statt Training
+        'venue': 'BVB Training Ground'
+    }
+    
+    # Priorisiere XML-Daten
+    if xml_data:
+        match_info['xml_data'] = xml_data
+    elif possession_data is not None:
+        match_info['possession_data'] = possession_data
+    else:
+        match_info['csv_filename'] = csv_filename
+        
+    match_id = create_or_get_match_id(match_info, match_db)
+    
+    # Zeige finale Match-ID
+    st.success(f"🆔 **Match-ID erstellt**: `{match_id}`")
+    
+    # Sammle alle Spieler für dieses Match
+    players_in_match = set()
+    
+    # Erstelle Player-ID-Mapping für diesen Export
+    player_id_mapping = {}
+    
+    # Sammle alle Spielernamen aus verschiedenen Spalten
+    player_columns = ['Player Name', 'passed_from', 'passed_to']
+    for col in player_columns:
+        if col in df.columns:
+            unique_players = df[col].dropna().unique()
+            for player_name in unique_players:
+                if player_name and str(player_name).strip():
+                    player_id = get_or_create_player_id(player_name, player_db)
+                    if player_id:
+                        player_id_mapping[player_name] = player_id
+                        players_in_match.add(player_id)
+    
+    # Aktualisiere Match-Datenbank mit Spielern
+    if match_id in match_db["matches"]:
+        match_db["matches"][match_id]["players"] = list(players_in_match)
+    
+    # Speichere aktualisierte Datenbanken
+    save_player_database(player_db)
+    save_match_database(match_db)
+    
+    # Metadata für den Export mit erweiterten Match-Informationen
+    match_entry = match_db["matches"].get(match_id, {})
+    
+    metadata = {
+        "exportInfo": {
+            "exportId": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat(),
+            "source": "Shot-Plotter & Playermaker Data Analysis",
+            "version": "2.0",
+            "format": "structured_football_data"
+        },
+        "matchInfo": {
+            "matchId": match_id,
+            "originalFilename": csv_filename,
+            "matchDate": match_entry.get('match_date'),
+            "youthLevel": match_entry.get('youth_level'),
+            "team": match_entry.get('team', 'BVB'),
+            "opponent": match_entry.get('opponent'),
+            "dataSource": match_entry.get('data_source', 'unknown'),
+            "timestamp": datetime.now().isoformat(),
+            "dataProvider": "Shot-Plotter & Playermaker Integration",
+            "totalEvents": len(df),
+            "venue": match_entry.get('venue', 'BVB Training Ground'),
+            "matchType": match_entry.get('type', 'match')
+        },
+        "playerInfo": {
+            "totalPlayers": len(players_in_match),
+            "playerIdMapping": player_id_mapping
+        }
+    }
+    
+    # Events strukturieren
+    events = []
+    for index, row in df.iterrows():
+        # Extract timestamp for consistent event ID
+        timestamp = float(row.get('Zeit', 0)) if pd.notna(row.get('Zeit')) else 0
+        
+        # Extract youth level from data or use default
+        youth_level = "U12"  # Default, could be enhanced to extract from data
+        if 'Youth_Level' in row and pd.notna(row['Youth_Level']):
+            youth_level = str(row['Youth_Level'])
+        
+        # Generate consistent event ID
+        event_id = generate_consistent_event_id(timestamp, youth_level)
+        
+        # Basis Event-Struktur
+        event = {
+            "eventId": event_id,
+            "eventIndex": index + 1,
+            "timestamp": timestamp,
+            "period": 1,  # Standard auf Halbzeit 1, könnte erweitert werden
+            "minute": math.floor(timestamp / 60) if timestamp > 0 else 0,
+            "second": int(timestamp % 60) if timestamp > 0 else 0
+        }
+        
+        # Spieler-Informationen mit konsistenter ID
+        if 'Player Name' in row and pd.notna(row['Player Name']):
+            player_name = str(row['Player Name'])
+            player_id = player_id_mapping.get(player_name)
+            if player_id:
+                event["player"] = {
+                    "playerId": player_id,
+                    "playerName": player_name,
+                    "position": str(row.get('Position', 'Unknown'))
+                }
+        
+        # Pass-Informationen mit konsistenten IDs
+        pass_info = {}
+        if 'passed_from' in row and pd.notna(row['passed_from']):
+            from_player = str(row['passed_from'])
+            from_player_position = str(row['passed_from_Position'])
+            from_id = player_id_mapping.get(from_player)
+            if from_id:
+                pass_info["passFromId"] = from_id
+                pass_info["passFrom"] = from_player
+                pass_info["passFromPosition"] = from_player_position
+        
+        if 'passed_to' in row and pd.notna(row['passed_to']):
+            to_player = str(row['passed_to'])
+            to_player_position = str(row['passed_to_Position'])
+            to_id = player_id_mapping.get(to_player)
+            if to_id:
+                pass_info["passToId"] = to_id
+                pass_info["passTo"] = to_player
+                pass_info["passToPosition"] = to_player_position
+
+        if 'release_velocity' in row and pd.notna(row['release_velocity']):
+            pass_info["releaseVelocity"] = str(row['release_velocity'])
+        
+        if 'release_leg' in row and pd.notna(row['release_leg']):
+            pass_info["releaseLeg"] = str(row['release_leg'])
+        
+        if pass_info:
+            event["passInfo"] = pass_info
+        
+        # Position/Koordinaten
+        coordinates = {}
+        if 'X' in row and pd.notna(row['X']):
+            coordinates["start_x"] = float(row['X'])
+        if 'Y' in row and pd.notna(row['Y']):
+            coordinates["start_y"] = float(row['Y'])
+        if 'X2' in row and pd.notna(row['X2']):
+            coordinates["end_x"] = float(row['X2'])
+        if 'Y2' in row and pd.notna(row['Y2']):
+            coordinates["end_y"] = float(row['Y2'])
+        if coordinates:
+            event["coordinates"] = coordinates
+        
+        # Schuss-Informationen
+        if any(col in row.index for col in ['Shot', 'Goal', 'xG']):
+            shot_info = {}
+            if 'Shot' in row and pd.notna(row['Shot']):
+                shot_info["isShot"] = bool(row['Shot'])
+            if 'Goal' in row and pd.notna(row['Goal']):
+                shot_info["isGoal"] = bool(row['Goal'])
+            if 'xG' in row and pd.notna(row['xG']):
+                shot_info["expectedGoals"] = float(row['xG'])
+            if shot_info:
+                event["shotInfo"] = shot_info
+        
+        # Ballbesitz-Informationen
+        if 'in_team_possession' in row and pd.notna(row['in_team_possession']):
+            event["possession"] = {
+                "inTeamPossession": bool(row['in_team_possession']),
+                "actionType": str(row.get('action_type', 'UNKNOWN'))
+            }
+        
+        # Zusätzliche Attribute
+        additional_data = {}
+        for col, value in row.items():
+            if col not in ['Zeit','Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 'passed_from_Position', 'passed_to_Position', 'release_velocity', 
+                          'release_leg', 'X', 'Y', 'X2', 'Y2', 'in_team_possession', 
+                          'action_type', 'Position'] and pd.notna(value):
+                additional_data[col] = str(value) if not isinstance(value, (int, float, bool)) else value
+        
+        if additional_data:
+            event["additionalData"] = additional_data
+        
+        events.append(event)
+    
+    # Finale Struktur
+    structured_data = {
+        "metadata": metadata,
+        "events": events,
+        "statistics": {
+            "totalEvents": len(events),
+            "eventTypes": {
+                "shots": len([e for e in events if "shotInfo" in e]),
+                "passes": len([e for e in events if "passInfo" in e]),
+                "possessions": len([e for e in events if "possession" in e])
+            },
+            "timeRange": {
+                "start": min([e["timestamp"] for e in events]) if events else 0,
+                "end": max([e["timestamp"] for e in events]) if events else 0,
+                "duration": max([e["timestamp"] for e in events]) - min([e["timestamp"] for e in events]) if events else 0
+            },
+            "playerStatistics": {
+                "totalUniquePlayers": len(players_in_match),
+                "playersInThisMatch": list(players_in_match)
+            }
+        }
+    }
+    
+    return json.dumps(structured_data, indent=2, ensure_ascii=False)
+
+def extract_match_info_from_xml(xml_file_content):
+    """
+    Extrahiert Match-Informationen aus der XML-Datei.
+    Sucht nach SESSION_INFO start_time, text (Gegner + Jugend) und Team-Informationen in instance codes.
+    """
+    import xml.etree.ElementTree as ET
+    import re
+    from datetime import datetime
+    
+    match_info = {
+        'date': None,
+        'team': None,
+        'youth_level': None,
+        'opponent': None,
+        'venue': 'Unknown'
+    }
+    
+    try:
+        # Parse XML
+        if hasattr(xml_file_content, 'read'):
+            xml_content = xml_file_content.read()
+            xml_file_content.seek(0)  # Reset für weitere Verwendung
+        else:
+            xml_content = xml_file_content
+            
+        root = ET.fromstring(xml_content)
+        
+        # 1. Extrahiere Informationen aus SESSION_INFO
+        session_info = root.find('SESSION_INFO')
+        if session_info is not None:
+            # Datum extrahieren
+            start_time_elem = session_info.find('start_time')
+            if start_time_elem is not None:
+                start_time_str = start_time_elem.text
+                try:
+                    # Parse: "2023-11-04 12:58:01.000000+0100"
+                    dt = datetime.fromisoformat(start_time_str.replace('+0100', '+01:00'))
+                    match_info['date'] = dt.strftime('%Y-%m-%d')
+                except Exception as e:
+                    st.warning(f"Konnte Datum nicht parsen: {start_time_str}")
+            
+            # Gegner und Jugendkategorie aus text-Element extrahieren
+            # Format: "BMG U12" oder "Schalke U14" etc.
+            text_elem = session_info.find('text')
+            if text_elem is not None and text_elem.text:
+                text_content = text_elem.text.strip()
+                st.info(f"🔍 SESSION_INFO text gefunden: **{text_content}**")
+                
+                # Parse text für Jugendkategorie
+                youth_patterns = {
+                    'U19': r'u-?19|unter.?19|19er',
+                    'U17': r'u-?17|unter.?17|17er',
+                    'U16': r'u-?16|unter.?16|16er',
+                    'U15': r'u-?15|unter.?15|15er',
+                    'U14': r'u-?14|unter.?14|14er',
+                    'U13': r'u-?13|unter.?13|13er',
+                    'U12': r'u-?12|unter.?12|12er',
+                    'U11': r'u-?11|unter.?11|11er',
+                    'U10': r'u-?10|unter.?10|10er',
+                    'U9': r'u-?9|unter.?9|9er',
+                    'U8': r'u-?8|unter.?8|8er',
+                    'U7': r'u-?7|unter.?7|7er'
+                }
+                
+                text_lower = text_content.lower()
+                for youth, pattern in youth_patterns.items():
+                    if re.search(pattern, text_lower):
+                        match_info['youth_level'] = youth
+                        st.success(f"⚽ Jugendkategorie gefunden: **{youth}**")
+                        break
+                
+                # Parse text für Gegner (alles außer der Jugendkategorie)
+                # Entferne Jugendkategorie aus dem Text um Gegner zu extrahieren
+                opponent_text = text_content
+                if match_info['youth_level']:
+                    # Entferne alle Varianten der gefundenen Jugendkategorie
+                    youth_level = match_info['youth_level']
+                    patterns_to_remove = [
+                        youth_level,  # U12
+                        youth_level.lower(),  # u12
+                        youth_level.replace('U', 'u-'),  # u-12
+                        youth_level.replace('U', 'unter'),  # unter12
+                        youth_level.replace('U', '') + 'er'  # 12er
+                    ]
+                    
+                    for pattern in patterns_to_remove:
+                        opponent_text = re.sub(r'\b' + re.escape(pattern) + r'\b', '', opponent_text, flags=re.IGNORECASE)
+                
+                # Bereinige den Gegner-Text
+                opponent_text = re.sub(r'\s+', ' ', opponent_text.strip())  # Mehrfache Leerzeichen entfernen
+                
+                if opponent_text:
+                    match_info['opponent'] = opponent_text
+                    st.success(f"🆚 Gegner gefunden: **{opponent_text}**")
+                else:
+                    match_info['opponent'] = 'UNKNOWN'
+                    st.info("ℹ️ Kein spezifischer Gegner erkannt - verwende 'UNKNOWN'")
+        
+        # 2. Extrahiere Team-Informationen aus instance codes (als Fallback oder Bestätigung)
+        instances = root.find('ALL_INSTANCES')
+        if instances is not None:
+            for instance in instances.findall('instance'):
+                code_elem = instance.find('code')
+                if code_elem is not None:
+                    code_text = code_elem.text.lower()
+                    
+                    # Suche nach Team-Informationen
+                    # Beispiel: "Borussia Dortmund U12 team ball possession"
+                    if 'team ball possession' in code_text or 'borussia dortmund' in code_text or 'bvb' in code_text:
+                        # Team-Name
+                        if 'borussia dortmund' in code_text or 'bvb' in code_text:
+                            match_info['team'] = 'BVB'
+                            st.success(f"🏆 Team gefunden: **BVB**")
+                        
+                        # Falls noch keine Jugendkategorie aus SESSION_INFO, versuche aus instance code
+                        if not match_info['youth_level']:
+                            youth_patterns = {
+                                'U19': r'u-?19|unter.?19|19er',
+                                'U17': r'u-?17|unter.?17|17er',
+                                'U16': r'u-?16|unter.?16|16er',
+                                'U15': r'u-?15|unter.?15|15er',
+                                'U14': r'u-?14|unter.?14|14er',
+                                'U13': r'u-?13|unter.?13|13er',
+                                'U12': r'u-?12|unter.?12|12er',
+                                'U11': r'u-?11|unter.?11|11er',
+                                'U10': r'u-?10|unter.?10|10er',
+                                'U9': r'u-?9|unter.?9|9er',
+                                'U8': r'u-?8|unter.?8|8er',
+                                'U7': r'u-?7|unter.?7|7er'
+                            }
+                            
+                            for youth, pattern in youth_patterns.items():
+                                if re.search(pattern, code_text):
+                                    match_info['youth_level'] = youth
+                                    st.info(f"⚽ Jugendkategorie aus instance code: **{youth}**")
+                                    break
+                        
+                        # Wenn wir Team-Info gefunden haben, können wir aufhören
+                        if match_info['team']:
+                            break
+        
+        # Fallback: Setze Standard-Team wenn nicht gefunden
+        if not match_info['team']:
+            match_info['team'] = 'BVB'
+            st.info("🏆 Kein Team gefunden - verwende Standard: **BVB**")
+        
+        return match_info
+        
+    except Exception as e:
+        st.warning(f"Fehler beim Parsen der XML-Datei: {str(e)}")
+        return match_info
+# Event Database Functions
+def load_event_database():
+    """Lädt die Event-Datenbank von lokaler JSON-Datei"""
+    try:
+        if os.path.exists("event_database.json"):
+            with open("event_database.json", "r", encoding='utf-8') as f:
+                return json.load(f)
+        else:
+            # Neue Datenbank initialisieren
+            return {
+                "events_by_match": {},
+                "metadata": {
+                    "created_at": datetime.now().isoformat(),
+                    "last_updated": datetime.now().isoformat(),
+                    "total_matches": 0,
+                    "total_events": 0
+                }
+            }
+    except Exception as e:
+        st.error(f"Fehler beim Laden der Event-Datenbank: {str(e)}")
+        return {
+            "events_by_match": {},
+            "metadata": {
+                "created_at": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat(),
+                "total_matches": 0,
+                "total_events": 0
+            }
+        }
+
+def save_event_database(event_db):
+    """Speichert die Event-Datenbank in lokale JSON-Datei"""
+    try:
+        # Metadaten aktualisieren
+        event_db["metadata"]["last_updated"] = datetime.now().isoformat()
+        event_db["metadata"]["total_matches"] = len(event_db["events_by_match"])
+        total_events = sum(len(match_data.get("events", [])) for match_data in event_db["events_by_match"].values())
+        event_db["metadata"]["total_events"] = total_events
+        
+        # Bereinige Daten für JSON-Export
+        clean_event_db = clean_data_for_json(event_db)
+        
+        with open("event_database.json", "w", encoding='utf-8') as f:
+            json.dump(clean_event_db, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        st.warning(f"Fehler beim Speichern der Event-Datenbank: {str(e)}")
+        return False
+
+def add_or_replace_events_in_database(match_id, events_data, match_metadata, event_db):
+    """
+    Fügt Events zur Event-Datenbank hinzu oder ersetzt bestehende Events für dieses Match.
+    Funktioniert ähnlich wie create_or_get_match_id - überschreibt bei existierender Match-ID.
+    """
+    try:
+        # Prüfe, ob bereits Events für diese Match-ID existieren
+        existing_match = match_id in event_db["events_by_match"]
+        
+        if existing_match:
+            st.info(f"🔄 Match-ID '{match_id}' existiert bereits - überschreibe Events...")
+            old_event_count = len(event_db["events_by_match"][match_id]["events"])
+        else:
+            st.info(f"🆕 Neue Match-ID '{match_id}' - erstelle neuen Eintrag...")
+            old_event_count = 0
+        
+        # Erstelle/überschreibe den Match-Eintrag komplett
+        event_db["events_by_match"][match_id] = {
+            "match_info": match_metadata,
+            "events": events_data,  # ÜBERSCHREIBE alle Events
+            "added_at": datetime.now().isoformat(),
+            "last_updated": datetime.now().isoformat()
+        }
+        
+        # Update Metadata
+        event_db["metadata"]["total_events"] = sum(
+            len(match_data["events"]) for match_data in event_db["events_by_match"].values()
+        )
+        event_db["metadata"]["total_matches"] = len(event_db["events_by_match"])
+        event_db["metadata"]["last_updated"] = datetime.now().isoformat()
+        
+        new_event_count = len(events_data)
+        
+        if existing_match:
+            st.success(f"✅ Events ersetzt: {old_event_count} → {new_event_count} Events für Match '{match_id}'")
+            return new_event_count  # Rückgabe der neuen Event-Anzahl
+        else:
+            st.success(f"✅ Neue Events hinzugefügt: {new_event_count} Events für Match '{match_id}'")
+            return new_event_count
+            
+    except Exception as e:
+        st.error(f"Fehler beim Speichern der Events: {str(e)}")
+        return 0
+
+def clean_data_for_json(data):
+    """Bereinigt Daten für JSON-Export (NaN -> null, etc.)"""
+    import math
+    
+    if isinstance(data, dict):
+        return {k: clean_data_for_json(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [clean_data_for_json(item) for item in data]
+    elif isinstance(data, float) and math.isnan(data):
+        return None
+    elif data is None or str(data).lower() == 'nan':
+        return None
+    else:
+        return data
+
 
 # Definiere Tabs für den Workflow
 tabs = st.tabs(["Daten hochladen", "Daten verarbeiten", "Ergebnisse", "📄 XML Merger", "📊 CSV Merger", "🔧 JSON Merger"])
@@ -1881,124 +2705,6 @@ with tabs[2]:
                 # Anzeigen als DataFrame
                 st.dataframe(pd.DataFrame(player_stats))
         
-        with viz_tabs[1]:
-            st.markdown("#### Feldansicht")
-            st.markdown("Passvisualisierung auf dem Spielfeld - Startpunkt (X,Y) mit Farbcodierung nach Erfolg.")
-            
-            # Prüfe, ob passed_from/to und Player Name vorhanden sind
-            has_player_info = any(col in merged_data.columns for col in ['passed_from', 'passed_to', 'Player Name'])
-            
-            # Tooltip-Texte mit Spielerinformationen
-            hover_texts = []
-            for i, row in merged_data.iterrows():
-                text = f"Zeit: {row['Zeit']:.1f}s"
-                
-                # Füge neue Spalten zu den Tooltips hinzu
-                if 'Outcome' in row and pd.notna(row['Outcome']):
-                    text += f"<br>Ergebnis: {row['Outcome']}"
-                if 'Team' in row and pd.notna(row['Team']):
-                    text += f"<br>Team: {row['Team']}"
-                if 'Halbzeit' in row and pd.notna(row['Halbzeit']):
-                    text += f"<br>Halbzeit: {row['Halbzeit']}"
-                if 'Gegnerdruck' in row and pd.notna(row['Gegnerdruck']):
-                    text += f"<br>Gegnerdruck: {row['Gegnerdruck']}"
-                if 'Passhöhe' in row and pd.notna(row['Passhöhe']):
-                    text += f"<br>Passhöhe: {row['Passhöhe']}"
-                if 'Situation' in row and pd.notna(row['Situation']):
-                    text += f"<br>Situation: {row['Situation']}"
-                if 'Aktionstyp' in row and pd.notna(row['Aktionstyp']):
-                    text += f"<br>Aktionstyp: {row['Aktionstyp']}"
-                
-                # Füge Spielerinformationen hinzu, wenn vorhanden
-                if 'Player Name' in row and pd.notna(row['Player Name']):
-                    text += f"<br>Spieler: {row['Player Name']}"
-                if 'passed_from' in row and pd.notna(row['passed_from']):
-                    text += f"<br>Absender: {row['passed_from']}"
-                if 'passed_to' in row and pd.notna(row['passed_to']):
-                    text += f"<br>Empfänger: {row['passed_to']}"
-                    
-                hover_texts.append(text)
-            
-            # Erzeuge den Feldplot mit aktualisierten Tooltips
-            field_fig = go.Figure()
-            
-            # Farbcodierung basierend auf Outcome
-            colors = []
-            for i, row in merged_data.iterrows():
-                if 'Outcome' in row and pd.notna(row['Outcome']):
-                    outcome = str(row['Outcome']).lower()
-                    if any(keyword in outcome for keyword in ['erfolgreich', 'success', 'goal']):
-                        colors.append('green')
-                    else:
-                        colors.append('red')
-                else:
-                    colors.append('blue')  # Standardfarbe wenn kein Outcome vorhanden
-            
-            # Füge Scatter-Plot für Startpositionen hinzu
-            field_fig.add_trace(go.Scatter(
-                x=merged_data['X'],
-                y=merged_data['Y'],
-                mode='markers',
-                marker=dict(
-                    color=colors,
-                    size=8
-                ),
-                text=hover_texts,
-                hoverinfo='text',
-                name='Startpositionen'
-            ))
-            
-            # Füge Linien für Pässe hinzu (nur wenn X2 und Y2 vorhanden sind)
-            if 'X2' in merged_data.columns and 'Y2' in merged_data.columns:
-                for i, row in merged_data.iterrows():
-                    if pd.notna(row['X2']) and pd.notna(row['Y2']):
-                        field_fig.add_trace(go.Scatter(
-                            x=[row['X'], row['X2']],
-                            y=[row['Y'], row['Y2']],
-                            mode='lines',
-                            line=dict(
-                                color=colors[i] if i < len(colors) else 'blue',
-                                width=1
-                            ),
-                            showlegend=False,
-                            hoverinfo='skip'
-                        ))
-            
-            # Füge Spielernamen als Annotation hinzu, wenn vorhanden
-            if has_player_info:
-                st.subheader("Spieler-Informationen")
-                player_cols = st.columns(3)
-                
-                with player_cols[0]:
-                    if 'Player Name' in merged_data.columns:
-                        unique_players = merged_data['Player Name'].dropna().unique()
-                        st.write("Spieler:", ", ".join([str(p) for p in unique_players]))
-                
-                with player_cols[1]:
-                    if 'passed_from' in merged_data.columns:
-                        unique_senders = merged_data['passed_from'].dropna().unique()
-                        st.write("Absender:", ", ".join([str(p) for p in unique_senders]))
-                
-                with player_cols[2]:
-                    if 'passed_to' in merged_data.columns:
-                        unique_receivers = merged_data['passed_to'].dropna().unique()
-                        st.write("Empfänger:", ", ".join([str(p) for p in unique_receivers]))
-            
-            # Feldeinstellungen
-            field_fig.update_layout(
-                title='Passpositionen auf dem Spielfeld',
-                xaxis=dict(title='X-Position', range=[-60, 60]),
-                yaxis=dict(title='Y-Position', range=[-40, 40]),
-                legend=dict(
-                    yanchor="top",
-                    y=0.99,
-                    xanchor="left",
-                    x=0.01
-                )
-            )
-            
-            st.plotly_chart(field_fig, use_container_width=True)
-        
         with viz_tabs[2]:
             st.markdown("#### Zeitliche Verteilung")
             # Zeitverteilung der Passes
@@ -2140,14 +2846,326 @@ with tabs[2]:
             )
         
         with col2:
-            # JSON Export
-            json_str = export_data.to_json(orient="records")
-            st.download_button(
-                label="Als JSON herunterladen",
-                data=json_str,
-                file_name="merged_pass_data.json",
-                mime="application/json"
-            )
+            # JSON Export Options
+            st.markdown("**JSON Export & Event-Archiv**")
+            
+            # Enhanced Structured JSON Export with persistent IDs
+            try:
+                structured_json_with_ids = create_structured_json_export_with_ids(export_data)
+                
+                # Extrahiere Match-ID aus dem JSON für den Dateinamen
+                try:
+                    json_data = json.loads(structured_json_with_ids)
+                    match_id_for_filename = json_data.get("match_info", {}).get("match_id", "unknown_match")
+                except:
+                    match_id_for_filename = "unknown_match"
+                
+                st.download_button(
+                    label="🆔 Strukturiertes JSON mit IDs herunterladen",
+                    data=structured_json_with_ids,
+                    file_name=f"{match_id_for_filename}.json",
+                    mime="application/json",
+                    help="Erweiterte JSON-Struktur mit konsistenten Spieler- und Match-IDs (BVB_00001, XML SESSION_INFO-basiert)"
+                )
+                
+                # Event-Archivierung Button (NUR bei Klick speichern)
+                if st.button("📚 Events herunterladen & im Archiv speichern", key="save_events_btn"):
+                    try:
+                        # Event-Archiv erstellen und lokal speichern
+                        player_db = load_player_database()
+                        match_db = load_match_database()
+                        event_db = load_event_database()
+                        
+                        # Match-Informationen extrahieren - GLEICHE LOGIK WIE create_structured_json_export_with_ids
+                        xml_data = None
+                        possession_data = None
+                        csv_filename = ""
+                        
+                        # 1. Priorität: XML-Daten (am zuverlässigsten)
+                        if 'xml_file' in st.session_state and st.session_state.xml_file is not None:
+                            xml_data = st.session_state.xml_file
+                        
+                        # 2. Fallback: Possession-Daten
+                        elif 'possession_summary' in st.session_state and st.session_state.possession_summary is not None:
+                            possession_data = st.session_state.possession_summary
+                        
+                        # 3. Fallback: CSV-Dateiname
+                        if 'shot_plotter_file' in st.session_state:
+                            csv_filename = st.session_state.shot_plotter_file.name
+                        
+                        # Erstelle Match-Info basierend auf verfügbaren Daten (gleiche Priorität wie create_structured_json_export_with_ids)
+                        match_info = {
+                            'type': 'match',
+                            'venue': 'BVB Training Ground'
+                        }
+                        
+                        # Priorisiere XML-Daten
+                        if xml_data:
+                            match_info['xml_data'] = xml_data
+                        elif possession_data is not None:
+                            match_info['possession_data'] = possession_data
+                        else:
+                            match_info['csv_filename'] = csv_filename
+                        
+                        # Match ID erstellen/abrufen mit der gleichen Logik
+                        match_id = create_or_get_match_id(match_info, match_db)
+                        
+                        # Events aus export_data erstellen
+                        events_data = []
+                        for idx, row in export_data.iterrows():
+                            # Extract player information
+                            player_name = row.get('Player Name', 'Unknown')
+                            
+                            # Create coordinates structure
+                            coordinates = {}
+                            if 'X' in row and pd.notna(row['X']):
+                                coordinates["start_x"] = float(row['X'])
+                            if 'Y' in row and pd.notna(row['Y']):
+                                coordinates["start_y"] = float(row['Y'])
+                            if 'X2' in row and pd.notna(row['X2']):
+                                coordinates["end_x"] = float(row['X2'])
+                            if 'Y2' in row and pd.notna(row['Y2']):
+                                coordinates["end_y"] = float(row['Y2'])
+                            
+                            # Create passInfo structure
+                            pass_info = {}
+                            if 'passed_from' in row and pd.notna(row['passed_from']):
+                                pass_info["passFrom"] = str(row['passed_from'])
+                                if 'passed_from_Position' in row and pd.notna(row['passed_from_Position']):
+                                    pass_info["passFromPosition"] = str(row['passed_from_Position'])
+                            
+                            if 'passed_to' in row and pd.notna(row['passed_to']):
+                                pass_info["passTo"] = str(row['passed_to'])
+                                if 'passed_to_Position' in row and pd.notna(row['passed_to_Position']):
+                                    pass_info["passToPosition"] = str(row['passed_to_Position'])
+                            
+                            # Create passing_network for database structure
+                            passing_network = {
+                                "passed_from": row.get('passed_from'),
+                                "passed_to": row.get('passed_to'),
+                                "passed_from_Position": row.get('passed_from_Position'),
+                                "passed_to_Position": row.get('passed_to_Position')
+                            }
+                            
+                            # Clean additional_data - remove coordinates, passing info, and redundant data
+                            additional_data = {}
+                            for col, value in row.items():
+                                if col not in ['Zeit', 'Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 
+                                             'passed_from_Position', 'passed_to_Position', 'X', 'Y', 'X2', 'Y2', 
+                                             'Outcome', 'Aktionstyp', 'Position'] and pd.notna(value):
+                                    additional_data[col] = str(value) if not isinstance(value, (int, float, bool)) else value
+                            
+                            # Determine action_type
+                            action_type = row.get('Aktionstyp', 'Pass')
+                            if isinstance(action_type, str):
+                                action_type = action_type.upper()
+                            if action_type != "PASS" and action_type != "LOSS":
+                                action_type = "PASS"
+                            
+                            # Generate consistent event ID using timestamp and youth level
+                            timestamp = row.get('Zeit', 0)
+                            match_entry = match_db["matches"].get(match_id, {})
+                            youth_level = extract_youth_level_from_match_info(match_entry)
+                            event_id = generate_consistent_event_id(timestamp, youth_level)
+                            
+                            event = {
+                                "event_id": event_id,
+                                "timestamp": timestamp,
+                                "player": player_name,
+                                "action_type": action_type,
+                                "start_x": coordinates.get("start_x", 0),
+                                "start_y": coordinates.get("start_y", 0),
+                                "end_x": coordinates.get("end_x", 0),
+                                "end_y": coordinates.get("end_y", 0),
+                                "outcome": row.get('Outcome', ''),
+                                "team": row.get('Team', ''),
+                                "half": row.get('Halbzeit', 1),
+                                "additional_data": additional_data,
+                                "passing_network": passing_network
+                            }
+                            
+                            # Bereinige Event für JSON
+                            event = clean_data_for_json(event)
+                            events_data.append(event)
+                        
+                        # Match-Metadaten aus der Match-Database verwenden
+                        match_entry = match_db["matches"].get(match_id, {})
+                        match_metadata = {
+                            "match_id": match_id,
+                            "date": match_entry.get('match_date', datetime.now().strftime('%Y-%m-%d')),
+                            "team": match_entry.get('team', 'BVB'),
+                            "opponent": match_entry.get('opponent', 'Unknown'),
+                            "youth_level": match_entry.get('youth_level', 'SENIOR'),
+                            "venue": match_entry.get('venue', 'Unknown'),
+                            "total_events": len(events_data)
+                        }
+                        # Bereinige Match-Metadaten für JSON
+                        match_metadata = clean_data_for_json(match_metadata)
+                        
+                        # Events zur Datenbank hinzufügen
+                        new_events_count = add_or_replace_events_in_database(match_id, events_data, match_metadata, event_db)
+                        
+                        # Datenbanken speichern
+                        save_event_database(event_db)
+                        save_match_database(match_db)
+                        save_player_database(player_db)
+                        
+                        # Download-Datei erstellen
+                        event_export = {
+                            "match_info": match_metadata,
+                            "events": events_data,
+                            "export_metadata": {
+                                "exported_at": datetime.now().isoformat(),
+                                "total_events": len(events_data),
+                                "match_id": match_id
+                            }
+                        }
+                        
+                        # Erfolgreiche Speicherung anzeigen
+                        st.success(f"✅ {new_events_count} neue Events im Archiv gespeichert!")
+                        
+                        # Download-Button für das JSON erstellen
+                        st.download_button(
+                            label="💾 JSON-Datei herunterladen",
+                            data=json.dumps(event_export, indent=2, ensure_ascii=False),
+                            file_name=f"events_{match_id}.json",
+                            mime="application/json",
+                            help=f"Events wurden im lokalen Event-Archiv gespeichert. {new_events_count} neue Events hinzugefügt.",
+                            key="download_events_json"
+                        )
+                        
+                    except Exception as e:
+                        st.error(f"Fehler beim Speichern im Event-Archiv: {str(e)}")
+                
+                # Event-Archiv Status anzeigen (ohne zu speichern)
+                try:
+                    player_db = load_player_database()
+                    match_db = load_match_database()
+                    event_db = load_event_database()
+                    
+                    with st.expander("📊 Event-Archiv Status"):
+                        col_arch1, col_arch2, col_arch3 = st.columns(3)
+                        with col_arch1:
+                            st.metric("Gespeicherte Matches", event_db["metadata"]["total_matches"])
+                        with col_arch2:
+                            st.metric("Registrierte Spieler", len(player_db.get("players", {})))
+                        with col_arch3:
+                            st.metric("Gesamt Events", event_db["metadata"]["total_events"])
+                        
+                        st.info("💡 Klicke auf '📚 Events herunterladen & im Archiv speichern' um die aktuellen Events zu speichern.")
+                        
+                except Exception as e:
+                    st.warning(f"Fehler beim Laden der Archiv-Status: {str(e)}")
+                
+                # Zeige Info über das ID-System
+                with st.expander("ℹ️ Info zum ID-System"):
+                    st.markdown("""
+                    **Konsistente ID-Verwaltung:**
+                    
+                    - **Spieler-IDs**: Format `BVB_XXXXX` (z.B. BVB_00001, BVB_00002) - 5-stellig
+                    - **Event-IDs**: Format `YOUTH_timestamp` (z.B. U12_125.67, U17_89.23) - **NEU!**
+                    - **Match-IDs**: Intelligente Erstellung mit Datenpriorität
+                    
+                    **🆔 Event-ID System (NEU - Konsistent über alle Tabs):**
+                    
+                    **Format:** `YOUTH_timestamp`
+                    - **Youth-Level**: U12, U13, U14, U15, U16, U17, U19, SENIOR
+                    - **Timestamp**: Zeitstempel mit 2 Dezimalstellen (z.B. 125.67 = 2:05.67)
+                    
+                    **Beispiele:**
+                    - `U12_45.23` - U12-Event bei 45.23 Sekunden
+                    - `U17_125.67` - U17-Event bei 2:05.67 (125.67 Sekunden)
+                    - `SENIOR_1823.45` - Senior-Event bei 30:23.45
+                    
+                    **Vorteile des neuen Event-ID Systems:**
+                    - ✅ **Einzigartig**: Zeitstempel sind praktisch unique
+                    - ✅ **Konsistent**: Gleiche Methode in allen Tabs (Archivierung, JSON Export, Merger)
+                    - ✅ **Aussagekräftig**: Youth-Level und Zeit direkt erkennbar
+                    - ✅ **Sortierbar**: Chronologische Sortierung möglich
+                    - ✅ **Kompakt**: Kürzer als UUIDs, aber eindeutig
+                    - ✅ **Menschenlesbar**: Verständlich für Analysten
+                    
+                    **Ersetzt die alten Systeme:**
+                    - ❌ **Alt**: `event_1`, `event_2`, `event_3` (nicht eindeutig)
+                    - ❌ **Alt**: `d6a46c24-da07-4a83-83a9-8fe42ce1a479` (nicht lesbar)
+                    - ✅ **Neu**: `U12_125.67` (eindeutig UND lesbar)
+                    
+                    **Match-ID Erstellung (Prioritätssystem):**
+                    
+                    **1. 🎯 XML SESSION_INFO (Höchste Priorität):**
+                    - **Datum**: Aus `<SESSION_INFO><start_time>` extrahiert
+                    - **Gegner**: Aus `<SESSION_INFO><opponent>` extrahiert (z.B. BMG, S04, FCB)
+                    - **Jugend & Team**: Aus instance codes wie `"Borussia Dortmund U12 team ball possession"`
+                    - **Beispiel XML**: 
+                      ```xml
+                      <SESSION_INFO>
+                        <start_time>2023-11-04 12:58:01.000000+0100</start_time>
+                        <opponent>BMG</opponent>
+                      </SESSION_INFO>
+                      ```
+                    - **Team-Erkennung**: `Borussia Dortmund U12` → `U12_BVB`
+                    
+                    **2. 📊 Possession Summary (Fallback):**
+                    - Datum automatisch erkannt (DD.MM.YYYY, YYYY-MM-DD, MM/DD/YYYY)
+                    - Jugendmannschaft erkannt (U19, U17, U16, U15, U14, U13, U12, etc.)
+                    - Team-Information (BVB, Borussia Dortmund automatisch erkannt)
+                    - Gegner-Information falls in Daten vorhanden
+                    
+                    **3. 📁 CSV-Dateiname (Letzter Fallback):**
+                    - Basierend auf Dateinamen-Struktur
+                    - Automatische Viertel-Erkennung und -Zusammenführung
+                    
+                    **🆔 Match-ID Format:**
+                    - `JUGEND_TEAM-GEGNER_DATUM`
+                    - Beispiele:
+                      - `U12_BVB-BMG_2023-11-04` (aus XML SESSION_INFO)
+                      - `U17_BVB-S04_2023-12-15` (aus XML SESSION_INFO)
+                      - `SENIOR_BVB-FCB_2024-01-20` (aus Possession/CSV)
+                    
+                    **Vorteile des gesamten ID-Systems:**
+                    - ✅ **XML-Priorität**: Zuverlässigste Datenquelle (SESSION_INFO + instance codes)
+                    - ✅ **Automatisch**: Keine manuelle Eingabe erforderlich
+                    - ✅ **Intelligent**: Online-Suche für fehlende Gegner-Informationen
+                    - ✅ **Robust**: Mehrfache Fallback-Mechanismen
+                    - ✅ **Konsistent**: Eindeutige IDs über alle Analysen hinweg
+                    - ✅ **Semantisch**: Alle IDs sind aussagekräftig und lesbar
+                    - ✅ **Sicher**: Lokale Speicherung, keine sensiblen Daten in GitHub
+                    
+                    **Datenquellen-Hierarchie:**
+                    1. **XML SESSION_INFO** (am zuverlässigsten)
+                    2. **Possession Summary** (strukturierte Daten)
+                    3. **CSV-Dateiname** (Fallback)
+                    
+                    **Fallback-Mechanismen:**
+                    - Bei fehlenden XML-Daten: Possession-Daten als Basis
+                    - Bei fehlenden Possession-Daten: CSV-Dateiname als Basis
+                    - Bei fehlenden Datums-Informationen: Aktuelles Datum
+                    - Bei Online-Suche-Fehlern: Intelligente Vermutung basierend auf typischen Gegnern
+                    
+                    **Sicherheit:**
+                    - Spielerdaten werden nur lokal gespeichert
+                    - Keine sensiblen Daten in Git/GitHub
+                    - Automatische .gitignore-Einträge
+                    - Online-Suchen verwenden nur öffentliche Informationen
+                    """)
+                    
+                    # Status der Datenbanken anzeigen
+                    try:
+                        player_db = load_player_database()
+                        match_db = load_match_database()
+                        
+                        col_info1, col_info2 = st.columns(2)
+                        with col_info1:
+                            st.metric("Registrierte Spieler", len(player_db.get("players", {})))
+                        with col_info2:
+                            st.metric("Gespeicherte Matches", len(match_db.get("matches", {})))
+                            
+                    except Exception as e:
+                        st.warning(f"Fehler beim Laden der Datenbank-Info: {str(e)}")
+                        
+            except Exception as e:
+                st.error(f"Fehler beim Erstellen des ID-basierten JSON-Exports: {str(e)}")
+                st.info("Der Standard-Export ist weiterhin verfügbar.")
         
         with col3:
             # Excel Export
@@ -2597,43 +3615,240 @@ def parse_json_file_merger(uploaded_file):
         return None
 
 def adjust_time_values_json_merger(data, time_offset, time_field='Zeit'):
-    """Adjust time values in JSON data"""
+    """Adjust time values in JSON data - handles both simple lists and structured JSON"""
     adjusted_data = []
-    for item in data:
+    
+    # Handle different JSON structures
+    events_list = []
+    if isinstance(data, list):
+        events_list = data
+    elif isinstance(data, dict):
+        # Check for common event structures
+        if 'events' in data:
+            events_list = data['events']
+        elif 'data' in data:
+            events_list = data['data']
+        else:
+            # If it's a single event object, treat it as a list
+            events_list = [data]
+    else:
+        return adjusted_data
+    
+    for item in events_list:
+        if not isinstance(item, dict):
+            continue
+            
         adjusted_item = item.copy()
-        if time_field in adjusted_item:
-            try:
-                adjusted_item[time_field] = float(adjusted_item[time_field]) + time_offset
-            except (ValueError, TypeError):
-                pass  # Skip if not a valid number
+        
+        # Try different possible time field names
+        time_fields_to_check = [time_field, 'Zeit', 'time', 'timestamp']
+        
+        for field in time_fields_to_check:
+            if field in adjusted_item:
+                try:
+                    adjusted_item[field] = float(adjusted_item[field]) + time_offset
+                    break  # Found and adjusted time field, break out of loop
+                except (ValueError, TypeError):
+                    continue  # Try next field
+        
         adjusted_data.append(adjusted_item)
+    
     return adjusted_data
 
 def merge_json_quarters_merger(json_data_list, quarter_offsets, time_field='Zeit'):
-    """Merge multiple JSON quarters into one"""
+    """Merge multiple JSON quarters into one - handles different JSON structures and merges playerInfo"""
     if not json_data_list:
         return None
     
     merged_data = []
+    merged_player_info = {
+        "totalPlayers": 0,
+        "playerIdMapping": {}
+    }
+    
+    # Debug: Log the structure of input files
+    st.info(f"🔍 DEBUG: Verarbeite {len(json_data_list)} JSON-Dateien...")
     
     for i, json_data in enumerate(json_data_list):
         data = json_data['data']
+        filename = json_data['filename']
+        
+        st.info(f"🔍 DEBUG: Datei {i+1} ({filename}) - Typ: {type(data)}")
+        
+        # Extract playerInfo if available
+        if isinstance(data, dict) and 'playerInfo' in data:
+            player_info = data['playerInfo']
+            if 'playerIdMapping' in player_info:
+                # Merge playerIdMapping from this JSON
+                for player_name, player_id in player_info['playerIdMapping'].items():
+                    if player_name not in merged_player_info['playerIdMapping']:
+                        merged_player_info['playerIdMapping'][player_name] = player_id
+                st.info(f"🔍 DEBUG: Datei {i+1} - PlayerInfo gefunden mit {len(player_info.get('playerIdMapping', {}))} Spielern")
+            else:
+                st.info(f"🔍 DEBUG: Datei {i+1} - PlayerInfo vorhanden, aber kein playerIdMapping")
+        else:
+            st.info(f"🔍 DEBUG: Datei {i+1} - Keine PlayerInfo gefunden")
+        
+        # Extract events from data
+        events_to_process = []
+        if isinstance(data, list):
+            events_to_process = data
+            st.info(f"🔍 DEBUG: Datei {i+1} - Liste mit {len(events_to_process)} Events")
+        elif isinstance(data, dict):
+            if 'events' in data:
+                events_to_process = data['events']
+                st.info(f"🔍 DEBUG: Datei {i+1} - Events-Struktur mit {len(events_to_process)} Events")
+            elif 'data' in data:
+                events_to_process = data['data']
+                st.info(f"🔍 DEBUG: Datei {i+1} - Data-Struktur mit {len(events_to_process)} Events")
+            else:
+                events_to_process = [data]
+                st.info(f"🔍 DEBUG: Datei {i+1} - Einzelnes Event-Objekt")
+        
+        # Collect player names from events if no playerInfo available
+        if not merged_player_info['playerIdMapping']:
+            players_from_events = set()
+            for event in events_to_process:
+                if isinstance(event, dict):
+                    # Try different player name fields
+                    player_field = event.get('Player Name', event.get('player', event.get('Player')))
+                    
+                    # Handle different player field formats
+                    player_name = None
+                    if isinstance(player_field, dict):
+                        # If player field is a dictionary, extract the actual name
+                        player_name = player_field.get('playerName', player_field.get('name', str(player_field)))
+                    elif isinstance(player_field, str):
+                        player_name = player_field
+                    elif player_field is not None:
+                        player_name = str(player_field)
+                    
+                    if player_name and str(player_name).strip() and str(player_name).strip().lower() != 'unknown':
+                        clean_name = str(player_name).strip()
+                        players_from_events.add(clean_name)
+            
+            # Create playerIdMapping from events if none exists
+            for player_name in players_from_events:
+                if player_name not in merged_player_info['playerIdMapping']:
+                    # Create a simple ID (könnte später durch echte Player-IDs ersetzt werden)
+                    merged_player_info['playerIdMapping'][player_name] = f"PLAYER_{len(merged_player_info['playerIdMapping']) + 1}"
+            
+            st.info(f"🔍 DEBUG: Datei {i+1} - Aus Events extrahiert: {len(players_from_events)} Spieler: {sorted(list(players_from_events))}")
+        
+        # Also collect players from this specific file even if playerIdMapping already exists
+        else:
+            # Always collect players from each file (for substitutions)
+            players_from_events = set()
+            for event in events_to_process:
+                if isinstance(event, dict):
+                    # Try different player name fields
+                    player_field = event.get('Player Name', event.get('player', event.get('Player')))
+                    
+                    # Handle different player field formats
+                    player_name = None
+                    if isinstance(player_field, dict):
+                        # If player field is a dictionary, extract the actual name
+                        player_name = player_field.get('playerName', player_field.get('name', str(player_field)))
+                    elif isinstance(player_field, str):
+                        player_name = player_field
+                    elif player_field is not None:
+                        player_name = str(player_field)
+                    
+                    if player_name and str(player_name).strip() and str(player_name).strip().lower() != 'unknown':
+                        clean_name = str(player_name).strip()
+                        players_from_events.add(clean_name)
+            
+            # Add all new players to the mapping
+            new_players_count = 0
+            for player_name in players_from_events:
+                if player_name not in merged_player_info['playerIdMapping']:
+                    merged_player_info['playerIdMapping'][player_name] = f"PLAYER_{len(merged_player_info['playerIdMapping']) + 1}"
+                    new_players_count += 1
+            
+            st.info(f"🔍 DEBUG: Datei {i+1} - Spieler gefunden: {len(players_from_events)}, neue Spieler: {new_players_count}")
+            st.info(f"🔍 DEBUG: Datei {i+1} - Alle Spieler: {sorted(list(players_from_events))}")
+            if new_players_count > 0:
+                new_players = [name for name in players_from_events if name in merged_player_info['playerIdMapping'] and any(merged_player_info['playerIdMapping'][name].endswith(str(x)) for x in range(len(merged_player_info['playerIdMapping']) - new_players_count + 1, len(merged_player_info['playerIdMapping']) + 1))]
+                st.info(f"🔍 DEBUG: Datei {i+1} - Neue Spieler: {sorted(new_players)}")
         
         # Adjust times
-        adjusted_data = adjust_time_values_json_merger(data, quarter_offsets[i], time_field)
+        adjusted_data = adjust_time_values_json_merger(events_to_process, quarter_offsets[i], time_field)
+        
+        # Add player names to events if they're missing or fix dictionary player names
+        for event in adjusted_data:
+            if isinstance(event, dict):
+                # Fix Player Name field if it's a dictionary
+                if 'Player Name' in event and isinstance(event['Player Name'], dict):
+                    player_dict = event['Player Name']
+                    clean_name = player_dict.get('playerName', player_dict.get('name', str(player_dict)))
+                    event['Player Name'] = clean_name
+                
+                # If event has playerId but no player name, try to resolve it
+                if 'playerId' in event and 'Player Name' not in event:
+                    player_id = event['playerId']
+                    # Find player name by ID
+                    for name, id_val in merged_player_info['playerIdMapping'].items():
+                        if id_val == player_id:
+                            event['Player Name'] = name
+                            break
+                
+                # If event has no Player Name but has other player fields, try to use them
+                if 'Player Name' not in event:
+                    if 'player' in event:
+                        player_field = event['player']
+                        if isinstance(player_field, dict):
+                            event['Player Name'] = player_field.get('playerName', player_field.get('name', str(player_field)))
+                        else:
+                            event['Player Name'] = str(player_field)
+                    elif 'Player' in event:
+                        player_field = event['Player']
+                        if isinstance(player_field, dict):
+                            event['Player Name'] = player_field.get('playerName', player_field.get('name', str(player_field)))
+                        else:
+                            event['Player Name'] = str(player_field)
+        
         merged_data.extend(adjusted_data)
     
-    # Sort by time field if it exists
-    if merged_data and time_field in merged_data[0]:
-        try:
-            merged_data.sort(key=lambda x: float(x.get(time_field, 0)))
-        except (ValueError, TypeError):
-            pass  # Skip sorting if time values are not numeric
+    # Update total players count
+    merged_player_info['totalPlayers'] = len(merged_player_info['playerIdMapping'])
     
-    return merged_data
+    st.info(f"🔍 DEBUG: Gesamt nach Merge - {merged_player_info['totalPlayers']} Spieler: {sorted(list(merged_player_info['playerIdMapping'].keys()))}")
+    
+    # Sort by time field if it exists
+    if merged_data:
+        # Try different possible time field names for sorting
+        time_fields_to_check = [time_field, 'Zeit', 'time', 'timestamp']
+        sort_field = None
+        
+        for field in time_fields_to_check:
+            if merged_data[0] and field in merged_data[0]:
+                sort_field = field
+                break
+        
+        if sort_field:
+            try:
+                merged_data.sort(key=lambda x: float(x.get(sort_field, 0)))
+            except (ValueError, TypeError):
+                pass  # Skip sorting if time values are not numeric
+    
+    # Return merged data with playerInfo attached
+    result = {
+        'events': merged_data,
+        'playerInfo': merged_player_info,
+        'metadata': {
+            'source': 'JSON_MERGER',
+            'total_files': len(json_data_list),
+            'total_events': len(merged_data),
+            'merged_at': datetime.now().isoformat()
+        }
+    }
+    
+    st.info(f"🔍 DEBUG: Rückgabe-Struktur - Events: {len(result['events'])}, PlayerInfo totalPlayers: {result['playerInfo']['totalPlayers']}")
+    
+    return result
 
 def create_json_download_file_merger(merged_data, filename):
-    """Create downloadable JSON file"""
+    """Create downloadable JSON file - handles new structure with events and playerInfo"""
     json_string = json.dumps(merged_data, indent=2, ensure_ascii=False)
     return json_string.encode('utf-8')
 
@@ -2734,116 +3949,693 @@ with tabs[4]:
 
 # 6. JSON Merger Tab
 with tabs[5]:
-    st.markdown("## 🔧 JSON Merger")
-    st.markdown("Lade mehrere JSON-Dateien von Vierteln hoch und führe sie zu einer zusammen.")
+    st.markdown("## 🔧 JSON Merger für Event-Daten")
+    st.markdown("**Führe strukturierte JSON-Dateien von verschiedenen Halbzeiten zusammen**")
     
-    # File uploader for JSON files
-    json_uploaded_files = st.file_uploader(
-        "JSON-Dateien hochladen",
-        type=['json'],
-        accept_multiple_files=True,
-        key="json_merger_files"
-    )
+    # Helper Functions für strukturierte JSON-Merger
+    def parse_structured_json_file(uploaded_file):
+        """Parse structured JSON file with event data"""
+        try:
+            content = uploaded_file.read()
+            data = json.loads(content)
+            uploaded_file.seek(0)
+            return data
+        except json.JSONDecodeError as e:
+            st.error(f"Fehler beim Parsen der JSON-Datei {uploaded_file.name}: {e}")
+            return None
     
-    if json_uploaded_files:
-        st.success(f"{len(json_uploaded_files)} JSON-Dateien hochgeladen!")
+    def validate_structured_json(data):
+        """Validate that JSON has the expected structure"""
+        if not isinstance(data, dict):
+            return False, "JSON muss ein Objekt sein"
         
-        # Quarter start times configuration
-        st.markdown("### ⏰ Viertel-Startzeiten konfigurieren")
-        col1, col2, col3, col4 = st.columns(4)
+        if 'metadata' not in data:
+            return False, "JSON muss 'metadata' enthalten"
         
-        json_q1_start = col1.number_input("1. Viertel Start (min)", value=0.0, step=0.1, key="json_q1")
-        json_q2_start = col2.number_input("2. Viertel Start (min)", value=15.0, step=0.1, key="json_q2")
-        json_q3_start = col3.number_input("3. Viertel Start (min)", value=30.0, step=0.1, key="json_q3")
-        json_q4_start = col4.number_input("4. Viertel Start (min)", value=45.0, step=0.1, key="json_q4")
+        if 'events' not in data:
+            return False, "JSON muss 'events' enthalten"
         
-        json_quarter_starts = [json_q1_start, json_q2_start, json_q3_start, json_q4_start]
+        if not isinstance(data['events'], list):
+            return False, "'events' muss eine Liste sein"
         
-        # Time field configuration
-        json_time_field = st.text_input("Name des Zeit-Feldes", value="Zeit", key="json_time_field")
+        return True, "JSON-Struktur ist gültig"
+    
+    def merge_structured_json_halves(json1, json2, time_offset_second_half=45.0):
+        """
+        Merge two structured JSON files representing different halves of a match
+        """
+        # Validate inputs
+        valid1, msg1 = validate_structured_json(json1)
+        valid2, msg2 = validate_structured_json(json2)
+        
+        if not valid1:
+            st.error(f"Erste JSON-Datei: {msg1}")
+            return None
+        
+        if not valid2:
+            st.error(f"Zweite JSON-Datei: {msg2}")
+            return None
+        
+        # Extract match IDs to verify they're the same match
+        match_id_1 = json1.get('metadata', {}).get('matchInfo', {}).get('matchId', 'unknown_1')
+        match_id_2 = json2.get('metadata', {}).get('matchInfo', {}).get('matchId', 'unknown_2')
+        
+        # Create merged structure
+        merged_json = {
+            "metadata": {
+                "exportInfo": {
+                    "exportId": str(uuid.uuid4()),
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "Shot-Plotter & Playermaker Data Analysis - Merged Halves",
+                    "version": "2.0",
+                    "format": "structured_football_data_merged",
+                    "originalFiles": [
+                        json1.get('metadata', {}).get('matchInfo', {}).get('originalFilename', 'unknown_1'),
+                        json2.get('metadata', {}).get('matchInfo', {}).get('originalFilename', 'unknown_2')
+                    ]
+                },
+                "matchInfo": {},
+                "playerInfo": {
+                    "totalPlayers": 0,
+                    "playerIdMapping": {}
+                }
+            },
+            "events": []
+        }
+        
+        # Merge match info (prefer first half's basic info, but combine specific details)
+        match_info_1 = json1.get('metadata', {}).get('matchInfo', {})
+        match_info_2 = json2.get('metadata', {}).get('matchInfo', {})
+        
+        merged_match_info = match_info_1.copy()
+        merged_match_info.update({
+            "timestamp": datetime.now().isoformat(),
+            "totalEvents": len(json1.get('events', [])) + len(json2.get('events', [])),
+            "dataSource": "merged_halves",
+            "originalFilenames": [
+                match_info_1.get('originalFilename', 'unknown_1'),
+                match_info_2.get('originalFilename', 'unknown_2')
+            ]
+        })
+        
+        merged_json["metadata"]["matchInfo"] = merged_match_info
+        
+        # Merge player info - combine all unique players
+        player_mapping_1 = json1.get('metadata', {}).get('playerInfo', {}).get('playerIdMapping', {})
+        player_mapping_2 = json2.get('metadata', {}).get('playerInfo', {}).get('playerIdMapping', {})
+        
+        # Combine player mappings, ensuring no ID conflicts
+        merged_player_mapping = player_mapping_1.copy()
+        used_ids = set(player_mapping_1.values())
+        
+        for player_name, player_id in player_mapping_2.items():
+            if player_name not in merged_player_mapping:
+                # Check if this ID is already used
+                if player_id in used_ids:
+                    # Generate new unique ID
+                    base_num = len(merged_player_mapping) + 1
+                    new_id = f"BVB_{base_num:05d}"
+                    while new_id in used_ids:
+                        base_num += 1
+                        new_id = f"BVB_{base_num:05d}"
+                    merged_player_mapping[player_name] = new_id
+                    used_ids.add(new_id)
+                    st.info(f"🔄 Spieler '{player_name}': ID-Konflikt gelöst ({player_id} → {new_id})")
+                else:
+                    merged_player_mapping[player_name] = player_id
+                    used_ids.add(player_id)
+            else:
+                # Player already exists, check if IDs match
+                existing_id = merged_player_mapping[player_name]
+                if existing_id != player_id:
+                    st.warning(f"⚠️ Spieler '{player_name}': Unterschiedliche IDs ({existing_id} vs {player_id}), behalte erste ID")
+        
+        merged_json["metadata"]["playerInfo"]["playerIdMapping"] = merged_player_mapping
+        merged_json["metadata"]["playerInfo"]["totalPlayers"] = len(merged_player_mapping)
+        
+        # Extract youth level from match metadata for consistent IDs
+        match_info = merged_json.get('metadata', {}).get('matchInfo', {})
+        youth_level = extract_youth_level_from_match_info(match_info)
+        
+        # Merge events
+        # First half events (no time adjustment needed)
+        events_1 = json1.get('events', [])
+        merged_events = []
+        
+        for i, event in enumerate(events_1):
+            merged_event = event.copy()
+            merged_event["eventIndex"] = i + 1
+            
+            # Generate consistent event ID using timestamp and youth level
+            timestamp = merged_event.get("timestamp", 0)
+            event_id = generate_consistent_event_id(timestamp, youth_level)
+            merged_event["eventId"] = event_id
+            
+            merged_events.append(merged_event)
+        
+        # Second half events (adjust timestamps)
+        events_2 = json2.get('events', [])
+        for i, event in enumerate(events_2):
+            merged_event = event.copy()
+            merged_event["eventIndex"] = len(merged_events) + 1
+            
+            # Adjust timestamp for second half first
+            adjusted_timestamp = None
+            if "timestamp" in merged_event:
+                try:
+                    original_timestamp = float(merged_event["timestamp"])
+                    adjusted_timestamp = original_timestamp + (time_offset_second_half * 60)  # Convert minutes to seconds
+                    merged_event["timestamp"] = adjusted_timestamp
+                    
+                    # Also adjust minute/second if they exist
+                    if "minute" in merged_event:
+                        merged_event["minute"] = int(adjusted_timestamp // 60)
+                    if "second" in merged_event:
+                        merged_event["second"] = int(adjusted_timestamp % 60)
+                except (ValueError, TypeError):
+                    st.warning(f"⚠️ Konnte Timestamp für Event {i+1} der zweiten Halbzeit nicht anpassen")
+                    adjusted_timestamp = merged_event.get("timestamp", 0)
+            
+            # Generate consistent event ID using adjusted timestamp and youth level
+            timestamp_for_id = adjusted_timestamp if adjusted_timestamp is not None else merged_event.get("timestamp", 0)
+            event_id = generate_consistent_event_id(timestamp_for_id, youth_level)
+            merged_event["eventId"] = event_id
+            
+            merged_events.append(merged_event)
+        
+        merged_json["events"] = merged_events
+        
+        return merged_json
+    
+    def update_databases_with_merged_json(merged_json):
+        """Update all databases with the merged JSON data using existing helper functions"""
+        try:
+            # Load databases
+            player_db = load_player_database()
+            match_db = load_match_database()
+            event_db = load_event_database()
+            
+            # Extract information from merged JSON
+            match_info = merged_json.get('metadata', {}).get('matchInfo', {})
+            player_mapping = merged_json.get('metadata', {}).get('playerInfo', {}).get('playerIdMapping', {})
+            events = merged_json.get('events', [])
+            
+            # Use the matchId directly from the merged JSON
+            match_id = match_info.get('matchId', f'unknown_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+            
+            st.info(f"🔍 DEBUG: Verwende Match-ID aus JSON: {match_id}")
+            st.info(f"🔍 DEBUG: Verarbeite {len(player_mapping)} Spieler und {len(events)} Events")
+            
+            # Check if this match already exists in the database, if not create it
+            if match_id not in match_db["matches"]:
+                match_entry = {
+                    "match_id": match_id,
+                    "identifier": match_id,  # Use the same as match_id since it's already structured
+                    "date": datetime.now().isoformat(),
+                    "type": "match",
+                    "venue": match_info.get('venue', 'BVB Training Ground'),
+                    "created": datetime.now().isoformat(),
+                    "players": [],
+                    "data_source": "merged_json_halves",
+                    "match_date": match_info.get('matchDate'),
+                    "youth_level": match_info.get('youthLevel'),
+                    "team": match_info.get('team', 'BVB'),
+                    "opponent": match_info.get('opponent', 'Unknown'),
+                    "original_filenames": match_info.get('originalFilenames', [])
+                }
+                match_db["matches"][match_id] = match_entry
+                st.info(f"🔍 DEBUG: Neuer Match-Eintrag erstellt für: {match_id}")
+            else:
+                st.info(f"🔍 DEBUG: Match-Eintrag bereits vorhanden für: {match_id}")
+            
+            # Update player database using existing helper function
+            updated_players = 0
+            for player_name, provided_player_id in player_mapping.items():
+                if player_name and str(player_name).strip():
+                    # Use the existing helper function to get or create player ID
+                    actual_player_id = get_or_create_player_id(player_name, player_db)
+                    
+                    if actual_player_id:
+                        # Check if this was a new player
+                        if actual_player_id == provided_player_id:
+                            # Same ID, potentially new player
+                            updated_players += 1
+                        
+                        # Update the player's matches list
+                        for existing_name, player_info in player_db["players"].items():
+                            if player_info["player_id"] == actual_player_id:
+                                if "matches_played" not in player_info:
+                                    player_info["matches_played"] = []
+                                if match_id not in player_info["matches_played"]:
+                                    player_info["matches_played"].append(match_id)
+                                break
+            
+            st.info(f"🔍 DEBUG: Spieler-Datenbank aktualisiert. Neue/Aktualisierte Spieler: {updated_players}")
+            
+            # Convert events to the format expected by add_or_replace_events_in_database
+            events_for_db = []
+            for i, event in enumerate(events):
+                # Extract player information
+                player_info = event.get("player", {})
+                if isinstance(player_info, dict):
+                    player_name = player_info.get("playerName", "Unknown")
+                    player_id = player_info.get("playerId")
+                    player_position = player_info.get("position")
+                else:
+                    player_name = str(player_info) if player_info else "Unknown"
+                    player_id = None
+                    player_position = None
+                
+                # If no player_id, try to get it from our mapping
+                if not player_id and player_name in player_mapping:
+                    player_id = player_mapping[player_name]
+                
+                # Extract coordinates from the event
+                coordinates = event.get("coordinates", {})
+                additional_data = event.get("additionalData", {})
+                
+                # Debug: Show what we're extracting
+                if i < 2:  # Only show for first 2 events to avoid spam
+                    st.info(f"🔍 DEBUG Event {i+1}: coordinates={coordinates}, additionalData keys={list(additional_data.keys())}")
+                
+                # Get coordinate values
+                start_x = coordinates.get("start_x",0)
+                start_y = coordinates.get("start_y", 0)
+                end_x = coordinates.get("end_x", 0)
+                end_y = coordinates.get("end_y", 0)
+                
+                # Extract pass information from passInfo
+                pass_info = event.get("passInfo", {})
+                
+                # Create passing_network data from passInfo
+                passing_network = {
+                    "passed_from": pass_info.get('passFrom'),
+                    "passed_to": pass_info.get('passTo'),
+                    "passed_from_Position": pass_info.get('passFromPosition'),
+                    "passed_to_Position": pass_info.get('passToPosition')
+                }
+                
+                # Clean additional_data - remove redundant data that's now elsewhere
+                cleaned_additional_data = {k: v for k, v in additional_data.items() 
+                                         if k not in ["X", "Y", "X2", "Y2", "passed_to_Position", 
+                                                     "Aktionstyp", "Team", "Halbzeit"]}
+                
+                # Determine action_type
+                action_type = additional_data.get("Aktionstyp", "").upper()
+                
+                # Get outcome - use empty string as fallback like in Tab 2
+                outcome = additional_data.get("Outcome", "")
+                
+                # Extract youth level from match info
+                youth_level = extract_youth_level_from_match_info(match_info)
+                
+                # Debug: Show extracted values for first event
+                if i == 0:
+                    st.info(f"🔍 DEBUG First Event: start_x={start_x}, start_y={start_y}, end_x={end_x}, end_y={end_y}, outcome='{outcome}', action_type='{action_type}', youth_level='{youth_level}'")
+                
+                # Generate consistent event ID using timestamp and youth level
+                timestamp = event.get("timestamp", 0)
+                event_id = generate_consistent_event_id(timestamp, youth_level)
+                
+                # Create database event with correct structure
+                db_event = {
+                    "event_id": event_id,
+                    "timestamp": timestamp,
+                    "player": player_name,
+                    "action_type": action_type,
+                    "start_x": start_x,
+                    "start_y": start_y,
+                    "end_x": end_x,
+                    "end_y": end_y,
+                    "outcome": outcome,
+                    "team": match_info.get('team', ''),
+                    "half": event.get("period", additional_data.get("Halbzeit", 1)),
+                    "additional_data": cleaned_additional_data,
+                    "passing_network": passing_network
+                }
+                
+                # Clean the event data
+                db_event = clean_data_for_json(db_event)
+                events_for_db.append(db_event)
+            
+            st.info(f"🔍 DEBUG: {len(events_for_db)} Events für Datenbank vorbereitet")
+            
+            # Create match metadata for event database
+            match_metadata = {
+                "match_id": match_id,
+                "date": match_info.get('matchDate', datetime.now().strftime('%Y-%m-%d')),
+                "team": match_info.get('team', 'BVB'),
+                "opponent": match_info.get('opponent', 'Unknown'),
+                "youth_level": match_info.get('youthLevel', 'UNKNOWN'),
+                "venue": match_info.get('venue', 'BVB Training Ground'),
+                "total_events": len(events_for_db),
+                "data_source": "merged_json_halves",
+                "original_filenames": match_info.get('originalFilenames', [])
+            }
+            match_metadata = clean_data_for_json(match_metadata)
+            
+            # Update event database using existing helper function
+            events_count = add_or_replace_events_in_database(match_id, events_for_db, match_metadata, event_db)
+            st.info(f"🔍 DEBUG: {events_count} Events in Event-Datenbank gespeichert")
+            
+            # Save all databases using existing helper functions
+            st.info("🔍 DEBUG: Speichere Datenbanken...")
+            player_saved = save_player_database(player_db)
+            match_saved = save_match_database(match_db)
+            event_saved = save_event_database(event_db)
+            
+            st.info(f"🔍 DEBUG: Speicher-Status - Player: {player_saved}, Match: {match_saved}, Event: {event_saved}")
+            
+            # Reload databases to verify the save worked
+            try:
+                reloaded_player_db = load_player_database()
+                reloaded_match_db = load_match_database()
+                reloaded_event_db = load_event_database()
+                
+                final_player_count = len(reloaded_player_db.get("players", {}))
+                final_match_count = len(reloaded_match_db.get("matches", {}))
+                final_event_count = reloaded_event_db.get("metadata", {}).get("total_events", 0)
+                
+                st.success(f"✅ Datenbanken erfolgreich gespeichert!")
+                st.info(f"📊 Finale Zahlen: {final_player_count} Spieler, {final_match_count} Matches, {final_event_count} Events")
+                
+            except Exception as verify_error:
+                st.warning(f"⚠️ Fehler beim Verifizieren der gespeicherten Daten: {str(verify_error)}")
+            
+            return {
+                "success": player_saved and match_saved and event_saved,
+                "players_updated": updated_players,
+                "events_count": events_count,
+                "match_id": match_id,
+                "player_saved": player_saved,
+                "match_saved": match_saved,
+                "event_saved": event_saved
+            }
+            
+        except Exception as e:
+            st.error(f"❌ Fehler beim Aktualisieren der Datenbanken: {str(e)}")
+            import traceback
+            st.error(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": str(e)}
+    
+    # Main UI for JSON Merger
+    st.subheader("1. JSON-Dateien hochladen")
+    st.info("💡 Diese Funktion ist speziell für strukturierte Event-JSON-Dateien aus der Shot-Plotter-Analyse gedacht.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Erste Halbzeit JSON**")
+        json_file_1 = st.file_uploader(
+            "Erste Halbzeit (wird nicht zeitlich angepasst)",
+            type=['json'],
+            key="json_merger_file_1",
+            help="JSON-Datei der ersten Halbzeit oder des ersten Zeitabschnitts"
+        )
+    
+    with col2:
+        st.markdown("**Zweite Halbzeit JSON**")
+        json_file_2 = st.file_uploader(
+            "Zweite Halbzeit (Zeiten werden angepasst)",
+            type=['json'],
+            key="json_merger_file_2",
+            help="JSON-Datei der zweiten Halbzeit oder des zweiten Zeitabschnitts"
+        )
+    
+    # Time offset configuration
+    st.subheader("2. Zeitanpassung konfigurieren")
+    col_time1, col_time2 = st.columns(2)
+    
+    with col_time1:
+        time_offset = st.number_input(
+            "Zeitoffset für zweite Halbzeit (Minuten)",
+            min_value=0.0,
+            max_value=120.0,
+            value=45.0,
+            step=1.0,
+            help="Zeit in Minuten, die zu allen Events der zweiten Halbzeit addiert wird"
+        )
+    
+    with col_time2:
+        st.metric("Zeitoffset in Sekunden", f"{time_offset * 60:.0f} s")
+    
+    # Process files if both are uploaded
+    if json_file_1 and json_file_2:
+        st.subheader("3. JSON-Dateien verarbeiten")
         
         # Parse JSON files
-        st.markdown("### 📊 Datenvorschau")
-        json_data_list = []
+        with st.spinner("JSON-Dateien werden geladen..."):
+            json_data_1 = parse_structured_json_file(json_file_1)
+            json_data_2 = parse_structured_json_file(json_file_2)
         
-        for i, uploaded_file in enumerate(json_uploaded_files):
-            st.markdown(f"**Datei {i+1}: {uploaded_file.name}**")
+        if json_data_1 and json_data_2:
+            # Show file information
+            col_info1, col_info2 = st.columns(2)
             
-            json_data = parse_json_file_merger(uploaded_file)
-            if json_data is not None:
-                json_data_list.append({
-                    'filename': uploaded_file.name,
-                    'data': json_data
-                })
-                
-                # Show preview
-                if isinstance(json_data, list) and len(json_data) > 0:
-                    preview_data = json_data[:5]  # Show first 5 entries
-                    st.json(preview_data)
-                    st.markdown(f"📈 **Einträge:** {len(json_data)}")
-                    
-                    # Show time range if time field exists
-                    if json_time_field in json_data[0]:
-                        try:
-                            times = [float(item.get(json_time_field, 0)) for item in json_data if json_time_field in item]
-                            if times:
-                                time_range = f"{min(times):.1f} - {max(times):.1f}"
-                                st.markdown(f"⏰ **Zeitbereich:** {time_range} Minuten")
-                        except (ValueError, TypeError):
-                            st.markdown("⚠️ Zeit-Feld enthält nicht-numerische Werte")
-                else:
-                    st.json(json_data)
+            with col_info1:
+                st.markdown("**Erste Datei:**")
+                match_info_1 = json_data_1.get('metadata', {}).get('matchInfo', {})
+                st.write(f"**Match-ID:** {match_info_1.get('matchId', 'Unbekannt')}")
+                st.write(f"**Events:** {len(json_data_1.get('events', []))}")
+                st.write(f"**Spieler:** {json_data_1.get('metadata', {}).get('playerInfo', {}).get('totalPlayers', 0)}")
+                st.write(f"**Dateiname:** {match_info_1.get('originalFilename', 'Unbekannt')}")
+            
+            with col_info2:
+                st.markdown("**Zweite Datei:**")
+                match_info_2 = json_data_2.get('metadata', {}).get('matchInfo', {})
+                st.write(f"**Match-ID:** {match_info_2.get('matchId', 'Unbekannt')}")
+                st.write(f"**Events:** {len(json_data_2.get('events', []))}")
+                st.write(f"**Spieler:** {json_data_2.get('metadata', {}).get('playerInfo', {}).get('totalPlayers', 0)}")
+                st.write(f"**Dateiname:** {match_info_2.get('originalFilename', 'Unbekannt')}")
+            
+            # Check if match IDs are compatible
+            match_id_1 = match_info_1.get('matchId', '').split('_')[0:3]  # Extract base match info
+            match_id_2 = match_info_2.get('matchId', '').split('_')[0:3]
+            
+            if match_id_1 == match_id_2:
+                st.success("✅ Match-IDs sind kompatibel - selbes Spiel erkannt!")
             else:
-                st.error(f"Fehler beim Laden von {uploaded_file.name}")
-        
-        # Merge JSON files
-        if json_data_list:
+                st.warning("⚠️ Unterschiedliche Match-IDs - möglicherweise verschiedene Spiele!")
+            
+            # Merge button
             if st.button("🔧 JSON-Dateien zusammenführen", key="merge_json_btn"):
-                with st.spinner("Führe JSON-Dateien zusammen..."):
-                    # Calculate quarter offsets
-                    json_quarter_offsets = []
-                    for i in range(len(json_data_list)):
-                        if i < len(json_quarter_starts):
-                            json_quarter_offsets.append(json_quarter_starts[i])
-                        else:
-                            json_quarter_offsets.append(0)
-                        
-                    # Merge JSON quarters
-                    merged_json_data = merge_json_quarters_merger(json_data_list, json_quarter_offsets, json_time_field)
+                with st.spinner("JSON-Dateien werden zusammengeführt..."):
+                    merged_json = merge_structured_json_halves(json_data_1, json_data_2, time_offset)
+                
+                if merged_json:
+                    # Store merged data in session state immediately
+                    st.session_state['merged_json_data'] = merged_json
+                    st.session_state['json_merge_completed'] = True
+                    st.success("✅ JSON-Dateien erfolgreich zusammengeführt!")
+        
+        # Check if we have merged data (either just created or from session state)
+        if st.session_state.get('merged_json_data') and st.session_state.get('json_merge_completed'):
+            merged_json = st.session_state['merged_json_data']
+            
+            # Show merge statistics
+            st.subheader("4. Merge-Statistiken")
+            col_stats1, col_stats2, col_stats3 = st.columns(3)
+            
+            with col_stats1:
+                total_events = len(merged_json.get('events', []))
+                events_1 = len(json_data_1.get('events', [])) if 'json_data_1' in locals() else 0
+                events_2 = len(json_data_2.get('events', [])) if 'json_data_2' in locals() else 0
+                if events_1 > 0 and events_2 > 0:
+                    st.metric("Gesamt Events", total_events, f"{events_1} + {events_2}")
+                else:
+                    st.metric("Gesamt Events", total_events)
+            
+            with col_stats2:
+                total_players = merged_json.get('metadata', {}).get('playerInfo', {}).get('totalPlayers', 0)
+                st.metric("Einzigartige Spieler", total_players)
+            
+            with col_stats3:
+                match_id = merged_json.get('metadata', {}).get('matchInfo', {}).get('matchId', 'unknown')
+                st.metric("Match-ID", match_id)
+            
+            # Player mapping details
+            with st.expander("👥 Spieler-Mapping Details"):
+                player_mapping = merged_json.get('metadata', {}).get('playerInfo', {}).get('playerIdMapping', {})
+                if player_mapping:
+                    mapping_df = pd.DataFrame([
+                        {'Spieler': name, 'Player-ID': player_id}
+                        for name, player_id in player_mapping.items()
+                    ])
+                    st.dataframe(mapping_df, use_container_width=True)
+                else:
+                    st.info("Keine Spieler-Mappings verfügbar")
+            
+            # Download section
+            st.subheader("5. Download & Datenbank-Update")
+            
+            col_download1, col_download2 = st.columns(2)
+            
+            with col_download1:
+                # Download merged JSON
+                merged_json_str = json.dumps(merged_json, indent=2, ensure_ascii=False)
+                st.download_button(
+                    label="📥 Zusammengeführte JSON herunterladen",
+                    data=merged_json_str,
+                    file_name=f"merged_{match_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    help="Lädt die zusammengeführte JSON-Datei herunter"
+                )
+            
+            with col_download2:
+                # Update databases button
+                if st.button("🗄️ Datenbanken aktualisieren", key="update_db_btn"):
+                    with st.spinner("Datenbanken werden aktualisiert..."):
+                        result = update_databases_with_merged_json(merged_json)
                     
-                    if merged_json_data is not None:
-                        st.success("✅ JSON-Dateien erfolgreich zusammengeführt!")
+                    # Store update result in session state
+                    st.session_state['db_update_result'] = result
+                    st.session_state['db_update_completed'] = True
+            
+            # Show database update results if available
+            if st.session_state.get('db_update_completed') and st.session_state.get('db_update_result'):
+                result = st.session_state['db_update_result']
+                
+                if result.get("success", False):
+                    st.success("✅ Datenbanken erfolgreich aktualisiert!")
+                    
+                    # Detailed results
+                    col_result1, col_result2, col_result3 = st.columns(3)
+                    with col_result1:
+                        st.metric("Neue/Aktualisierte Spieler", result.get("players_updated", 0))
+                    with col_result2:
+                        st.metric("Events gespeichert", result.get("events_count", 0))
+                    with col_result3:
+                        st.metric("Match-ID", result.get("match_id", "unknown"))
+                    
+                    # Save status details
+                    with st.expander("🔍 Speicher-Details anzeigen"):
+                        col_save1, col_save2, col_save3 = st.columns(3)
                         
-                        # Show merged data preview
-                        st.markdown("### 📊 Zusammengeführte Daten")
-                        if isinstance(merged_json_data, list) and len(merged_json_data) > 0:
-                            preview_data = merged_json_data[:10]  # Show first 10 entries
-                            st.json(preview_data)
-                            st.markdown(f"📈 **Gesamteinträge:** {len(merged_json_data)}")
-                            
-                            # Show time range if time field exists
-                            if json_time_field in merged_json_data[0]:
-                                try:
-                                    times = [float(item.get(json_time_field, 0)) for item in merged_json_data if json_time_field in item]
-                                    if times:
-                                        time_range = f"{min(times):.1f} - {max(times):.1f}"
-                                        st.markdown(f"⏰ **Gesamtzeitbereich:** {time_range} Minuten")
-                                except (ValueError, TypeError):
-                                    st.markdown("⚠️ Zeit-Feld enthält nicht-numerische Werte")
-                        else:
-                            st.json(merged_json_data)
+                        with col_save1:
+                            if result.get("player_saved", False):
+                                st.success("✅ Spieler-DB gespeichert")
+                            else:
+                                st.error("❌ Spieler-DB Fehler")
                         
-                        # Download button
-                        output_filename = "merged_quarters.json"
-                        json_download_data = create_json_download_file_merger(merged_json_data, output_filename)
+                        with col_save2:
+                            if result.get("match_saved", False):
+                                st.success("✅ Match-DB gespeichert")
+                            else:
+                                st.error("❌ Match-DB Fehler")
                         
-                        st.download_button(
-                            label="📥 Zusammengeführte JSON-Datei herunterladen",
-                            data=json_download_data,
-                            file_name=output_filename,
-                            mime="application/json",
-                            key="download_merged_json"
-                        )
-                    else:
-                        st.error("❌ Fehler beim Zusammenführen der JSON-Dateien")
+                        with col_save3:
+                            if result.get("event_saved", False):
+                                st.success("✅ Event-DB gespeichert")
+                            else:
+                                st.error("❌ Event-DB Fehler")
+                    
+                    # Button to clear the session and start over
+                    if st.button("🔄 Neue Analyse starten", key="clear_merge_session"):
+                        for key in ['merged_json_data', 'json_merge_completed', 'db_update_result', 'db_update_completed']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.rerun()
+                    
+                else:
+                    st.error(f"❌ Fehler beim Aktualisieren der Datenbanken: {result.get('error', 'Unbekannter Fehler')}")
+                    
+                    # Show debug information if available
+                    if "error" in result:
+                        with st.expander("🔍 Fehler-Details anzeigen"):
+                            st.code(result["error"])
+                    
+                    # Button to retry
+                    if st.button("🔄 Erneut versuchen", key="retry_db_update"):
+                        if 'db_update_result' in st.session_state:
+                            del st.session_state['db_update_result']
+                        if 'db_update_completed' in st.session_state:
+                            del st.session_state['db_update_completed']
+                        st.rerun()
+    
+    else:
+        st.info("📂 Bitte laden Sie beide JSON-Dateien hoch, um mit dem Merge-Prozess zu beginnen.")
+    
+    # Database status section
+    st.subheader("📊 Datenbank-Status")
+    try:
+        col_db1, col_db2, col_db3 = st.columns(3)
+        
+        with col_db1:
+            player_db = load_player_database()
+            st.metric("Registrierte Spieler", len(player_db.get("players", {})))
+        
+        with col_db2:
+            match_db = load_match_database()
+            st.metric("Gespeicherte Matches", len(match_db.get("matches", {})))
+        
+        with col_db3:
+            event_db = load_event_database()
+            st.metric("Gesamt Events", event_db.get("metadata", {}).get("total_events", 0))
+        
+        # Show recent matches
+        with st.expander("🏆 Letzte Matches"):
+            match_db = load_match_database()
+            if match_db.get("matches"):
+                recent_matches = []
+                for match_id, match_info in match_db["matches"].items():
+                    recent_matches.append({
+                        "Match-ID": match_id,
+                        "Datum": match_info.get("match_date", "Unbekannt"),
+                        "Team": match_info.get("team", "Unbekannt"),
+                        "Gegner": match_info.get("opponent", "Unbekannt"),
+                        "Jugend": match_info.get("youth_level", "Unbekannt"),
+                        "Events": match_info.get("total_events", 0)
+                    })
+                
+                # Sort by date (newest first)
+                recent_matches.sort(key=lambda x: x["Datum"], reverse=True)
+                matches_df = pd.DataFrame(recent_matches[:10])  # Show last 10 matches
+                st.dataframe(matches_df, use_container_width=True)
+            else:
+                st.info("Noch keine Matches in der Datenbank gespeichert")
+                
+    except Exception as e:
+        st.warning(f"Fehler beim Laden des Datenbank-Status: {str(e)}")
+    
+    # Help section
+    with st.expander("ℹ️ Hilfe zum JSON Merger"):
+        st.markdown("""
+        **Verwendung des JSON Mergers:**
+        
+        1. **JSON-Dateien hochladen**: Laden Sie zwei strukturierte JSON-Dateien hoch, die verschiedene Halbzeiten/Zeitabschnitte desselben Spiels repräsentieren
+        
+        2. **Zeitanpassung**: Konfigurieren Sie den Zeitoffset für die zweite Halbzeit (Standard: 45 Minuten)
+        
+        3. **Zusammenführung**: Die App führt automatisch zusammen:
+           - **Events**: Alle Events beider Dateien mit angepassten Zeitstempeln
+           - **Spieler-IDs**: Vermeidet Duplikate und löst ID-Konflikte
+           - **Metadaten**: Kombiniert Match-Informationen
+        
+        4. **Download**: Erhalten Sie die zusammengeführte JSON-Datei
+        
+        5. **Datenbank-Update**: Aktualisieren Sie die lokalen Datenbanken mit den neuen Daten
+        
+        **Erwartete JSON-Struktur:**
+        ```json
+        {
+          "metadata": {
+            "matchInfo": { ... },
+            "playerInfo": {
+              "playerIdMapping": { ... }
+            }
+          },
+          "events": [ ... ]
+        }
+        ```
+        
+        **Vorteile:**
+        - ✅ Automatische Zeitanpassung
+        - ✅ Intelligente Spieler-ID-Verwaltung
+        - ✅ Datenbank-Integration
+        - ✅ Validierung der JSON-Struktur
+        - ✅ Conflict-Resolution für doppelte Spieler
+        """)
+
+
+
 

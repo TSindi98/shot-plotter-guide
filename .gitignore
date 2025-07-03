@@ -202,6 +202,15 @@ cython_debug/
 ehthumbs.db
 Thumbs.db
 
+# Sensitive data files - Player information
+players_database.json
+match_database.json
+event_database.json
+# Exclude any files in data directories that might contain sensitive information
+data/sensitive/
+player_data/
+match_data/
+
 # Python
 __pycache__/
 *.py[cod]
