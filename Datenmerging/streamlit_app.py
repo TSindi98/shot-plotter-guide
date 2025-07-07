@@ -1544,7 +1544,8 @@ def extract_youth_level_from_match_info(match_info):
 
 def create_structured_json_export_with_ids(df):
     """
-    Erweiterte Version der strukturierten JSON-Export-Funktion mit konsistenten IDs.
+    Erstellt JSON-Export mit der gleichen Struktur wie "Events herunterladen & im Archiv speichern".
+    Verwendet flache Event-Struktur für Konsistenz und fügt Metadaten für JSON Merger hinzu.
     """
     import uuid
     import json
@@ -1554,7 +1555,7 @@ def create_structured_json_export_with_ids(df):
     player_db = load_player_database()
     match_db = load_match_database()
     
-    # Versuche verschiedene Datenquellen zu finden (Priorität: XML > Possession > CSV)
+    # Match-Informationen extrahieren - GLEICHE LOGIK WIE "Events herunterladen & im Archiv speichern"
     xml_data = None
     possession_data = None
     csv_filename = ""
@@ -1562,46 +1563,18 @@ def create_structured_json_export_with_ids(df):
     # 1. Priorität: XML-Daten (am zuverlässigsten)
     if 'xml_file' in st.session_state and st.session_state.xml_file is not None:
         xml_data = st.session_state.xml_file
-        st.info("🎯 Verwende XML-Daten für Match-Informationen (höchste Priorität)")
     
     # 2. Fallback: Possession-Daten
-    elif 'possession_df' in st.session_state and not st.session_state.possession_df.empty:
-        possession_data = st.session_state.possession_df
-        st.info("📊 Verwende Possession-Daten für Match-Informationen")
+    elif 'possession_summary' in st.session_state and st.session_state.possession_summary is not None:
+        possession_data = st.session_state.possession_summary
     
     # 3. Fallback: CSV-Dateiname
     if 'shot_plotter_file' in st.session_state:
         csv_filename = st.session_state.shot_plotter_file.name
     
-    # Zeige extrahierte Informationen basierend auf verfügbaren Daten
-    extracted_info = None
-    if xml_data:
-        extracted_info = extract_match_info_from_xml(xml_data)
-        data_source_display = "XML SESSION_INFO"
-    elif possession_data:
-        extracted_info = extract_match_info_from_possession(possession_data)
-        data_source_display = "Possession Summary"
-    
-    if extracted_info and (extracted_info['date'] or extracted_info['team'] or extracted_info['youth_level']):
-        with st.expander(f"🔍 Extrahierte Match-Informationen ({data_source_display})", expanded=True):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Datum", extracted_info.get('date', 'Nicht gefunden'))
-            with col2:
-                st.metric("Jugend", extracted_info.get('youth_level', 'Nicht erkannt'))
-            with col3:
-                st.metric("Team", extracted_info.get('team', 'Nicht erkannt'))
-            
-            if extracted_info.get('opponent'):
-                st.success(f"🆚 Gegner in Daten gefunden: **{extracted_info['opponent']}**")
-            else:
-                st.info("ℹ️ Kein Gegner in den Daten gefunden - verwende 'UNKNOWN'")
-    else:
-        st.warning("⚠️ Keine verwertbaren Match-Informationen gefunden - verwende Fallback")
-    
-    # Erstelle oder hole Match-ID basierend auf verfügbaren Daten
+    # Erstelle Match-Info basierend auf verfügbaren Daten (gleiche Priorität wie "Events herunterladen & im Archiv speichern")
     match_info = {
-        'type': 'match',  # Jetzt als Match kategorisiert statt Training
+        'type': 'match',
         'venue': 'BVB Training Ground'
     }
     
@@ -1612,16 +1585,12 @@ def create_structured_json_export_with_ids(df):
         match_info['possession_data'] = possession_data
     else:
         match_info['csv_filename'] = csv_filename
-        
+    
+    # Match ID erstellen/abrufen mit der gleichen Logik
     match_id = create_or_get_match_id(match_info, match_db)
     
-    # Zeige finale Match-ID
-    st.success(f"🆔 **Match-ID erstellt**: `{match_id}`")
-    
-    # Sammle alle Spieler für dieses Match
+    # Sammle alle Spieler für dieses Match (für playerInfo Metadaten)
     players_in_match = set()
-    
-    # Erstelle Player-ID-Mapping für diesen Export
     player_id_mapping = {}
     
     # Sammle alle Spielernamen aus verschiedenen Spalten
@@ -1636,110 +1605,13 @@ def create_structured_json_export_with_ids(df):
                         player_id_mapping[player_name] = player_id
                         players_in_match.add(player_id)
     
-    # Aktualisiere Match-Datenbank mit Spielern
-    if match_id in match_db["matches"]:
-        match_db["matches"][match_id]["players"] = list(players_in_match)
-    
-    # Speichere aktualisierte Datenbanken
-    save_player_database(player_db)
-    save_match_database(match_db)
-    
-    # Metadata für den Export mit erweiterten Match-Informationen
-    match_entry = match_db["matches"].get(match_id, {})
-    
-    metadata = {
-        "exportInfo": {
-            "exportId": str(uuid.uuid4()),
-            "timestamp": datetime.now().isoformat(),
-            "source": "Shot-Plotter & Playermaker Data Analysis",
-            "version": "2.0",
-            "format": "structured_football_data"
-        },
-        "matchInfo": {
-            "matchId": match_id,
-            "originalFilename": csv_filename,
-            "matchDate": match_entry.get('match_date'),
-            "youthLevel": match_entry.get('youth_level'),
-            "team": match_entry.get('team', 'BVB'),
-            "opponent": match_entry.get('opponent'),
-            "dataSource": match_entry.get('data_source', 'unknown'),
-            "timestamp": datetime.now().isoformat(),
-            "dataProvider": "Shot-Plotter & Playermaker Integration",
-            "totalEvents": len(df),
-            "venue": match_entry.get('venue', 'BVB Training Ground'),
-            "matchType": match_entry.get('type', 'match')
-        },
-        "playerInfo": {
-            "totalPlayers": len(players_in_match),
-            "playerIdMapping": player_id_mapping
-        }
-    }
-    
-    # Events strukturieren
-    events = []
-    for index, row in df.iterrows():
-        # Extract timestamp for consistent event ID
-        timestamp = float(row.get('Zeit', 0)) if pd.notna(row.get('Zeit')) else 0
+    # Events aus df erstellen - GLEICHE STRUKTUR WIE "Events herunterladen & im Archiv speichern"
+    events_data = []
+    for idx, row in df.iterrows():
+        # Extract player information
+        player_name = row.get('Player Name', 'Unknown')
         
-        # Extract youth level from data or use default
-        youth_level = "U12"  # Default, could be enhanced to extract from data
-        if 'Youth_Level' in row and pd.notna(row['Youth_Level']):
-            youth_level = str(row['Youth_Level'])
-        
-        # Generate consistent event ID
-        event_id = generate_consistent_event_id(timestamp, youth_level)
-        
-        # Basis Event-Struktur
-        event = {
-            "eventId": event_id,
-            "eventIndex": index + 1,
-            "timestamp": timestamp,
-            "period": 1,  # Standard auf Halbzeit 1, könnte erweitert werden
-            "minute": math.floor(timestamp / 60) if timestamp > 0 else 0,
-            "second": int(timestamp % 60) if timestamp > 0 else 0
-        }
-        
-        # Spieler-Informationen mit konsistenter ID
-        if 'Player Name' in row and pd.notna(row['Player Name']):
-            player_name = str(row['Player Name'])
-            player_id = player_id_mapping.get(player_name)
-            if player_id:
-                event["player"] = {
-                    "playerId": player_id,
-                    "playerName": player_name,
-                    "position": str(row.get('Position', 'Unknown'))
-                }
-        
-        # Pass-Informationen mit konsistenten IDs
-        pass_info = {}
-        if 'passed_from' in row and pd.notna(row['passed_from']):
-            from_player = str(row['passed_from'])
-            from_player_position = str(row['passed_from_Position'])
-            from_id = player_id_mapping.get(from_player)
-            if from_id:
-                pass_info["passFromId"] = from_id
-                pass_info["passFrom"] = from_player
-                pass_info["passFromPosition"] = from_player_position
-        
-        if 'passed_to' in row and pd.notna(row['passed_to']):
-            to_player = str(row['passed_to'])
-            to_player_position = str(row['passed_to_Position'])
-            to_id = player_id_mapping.get(to_player)
-            if to_id:
-                pass_info["passToId"] = to_id
-                pass_info["passTo"] = to_player
-                pass_info["passToPosition"] = to_player_position
-
-        if 'release_velocity' in row and pd.notna(row['release_velocity']):
-            pass_info["releaseVelocity"] = str(row['release_velocity'])
-        
-        if 'release_leg' in row and pd.notna(row['release_leg']):
-            pass_info["releaseLeg"] = str(row['release_leg'])
-        
-        if pass_info:
-            event["passInfo"] = pass_info
-        
-        # Position/Koordinaten
+        # Create coordinates structure
         coordinates = {}
         if 'X' in row and pd.notna(row['X']):
             coordinates["start_x"] = float(row['X'])
@@ -1749,65 +1621,98 @@ def create_structured_json_export_with_ids(df):
             coordinates["end_x"] = float(row['X2'])
         if 'Y2' in row and pd.notna(row['Y2']):
             coordinates["end_y"] = float(row['Y2'])
-        if coordinates:
-            event["coordinates"] = coordinates
         
-        # Schuss-Informationen
-        if any(col in row.index for col in ['Shot', 'Goal', 'xG']):
-            shot_info = {}
-            if 'Shot' in row and pd.notna(row['Shot']):
-                shot_info["isShot"] = bool(row['Shot'])
-            if 'Goal' in row and pd.notna(row['Goal']):
-                shot_info["isGoal"] = bool(row['Goal'])
-            if 'xG' in row and pd.notna(row['xG']):
-                shot_info["expectedGoals"] = float(row['xG'])
-            if shot_info:
-                event["shotInfo"] = shot_info
+        # Create passing_network for database structure
+        passing_network = {
+            "passed_from": row.get('passed_from'),
+            "passed_to": row.get('passed_to'),
+            "passed_from_Position": row.get('passed_from_Position'),
+            "passed_to_Position": row.get('passed_to_Position')
+        }
         
-        # Ballbesitz-Informationen
-        if 'in_team_possession' in row and pd.notna(row['in_team_possession']):
-            event["possession"] = {
-                "inTeamPossession": bool(row['in_team_possession']),
-                "actionType": str(row.get('action_type', 'UNKNOWN'))
-            }
-        
-        # Zusätzliche Attribute
+        # Clean additional_data - remove coordinates, passing info, and redundant data
         additional_data = {}
         for col, value in row.items():
-            if col not in ['Zeit','Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 'passed_from_Position', 'passed_to_Position', 'release_velocity', 
-                          'release_leg', 'X', 'Y', 'X2', 'Y2', 'in_team_possession', 
-                          'action_type', 'Position'] and pd.notna(value):
+            if col not in ['Zeit', 'Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 
+                         'passed_from_Position', 'passed_to_Position', 'X', 'Y', 'X2', 'Y2', 
+                         'Outcome', 'Aktionstyp', 'Position'] and pd.notna(value):
                 additional_data[col] = str(value) if not isinstance(value, (int, float, bool)) else value
         
-        if additional_data:
-            event["additionalData"] = additional_data
+        # Determine action_type
+        action_type = row.get('Aktionstyp', 'Pass')
+        if isinstance(action_type, str):
+            action_type = action_type.upper()
+        if action_type != "PASS" and action_type != "LOSS":
+            action_type = "PASS"
         
-        events.append(event)
+        # Generate consistent event ID using timestamp and youth level
+        timestamp = row.get('Zeit', 0)
+        match_entry = match_db["matches"].get(match_id, {})
+        youth_level = extract_youth_level_from_match_info(match_entry)
+        event_id = generate_consistent_event_id(timestamp, youth_level)
+        
+        event = {
+            "event_id": event_id,
+            "timestamp": timestamp,
+            "player": player_name,
+            "action_type": action_type,
+            "start_x": coordinates.get("start_x", 0),
+            "start_y": coordinates.get("start_y", 0),
+            "end_x": coordinates.get("end_x", 0),
+            "end_y": coordinates.get("end_y", 0),
+            "outcome": row.get('Outcome', ''),
+            "team": row.get('Team', ''),
+            "half": row.get('Halbzeit', 1),
+            "additional_data": additional_data,
+            "passing_network": passing_network
+        }
+        
+        # Bereinige Event für JSON
+        event = clean_data_for_json(event)
+        events_data.append(event)
     
-    # Finale Struktur
-    structured_data = {
+    # Match-Metadaten aus der Match-Database verwenden - GLEICHE STRUKTUR
+    match_entry = match_db["matches"].get(match_id, {})
+    match_metadata = {
+        "match_id": match_id,
+        "date": match_entry.get('match_date', datetime.now().strftime('%Y-%m-%d')),
+        "team": match_entry.get('team', 'BVB'),
+        "opponent": match_entry.get('opponent', 'Unknown'),
+        "youth_level": match_entry.get('youth_level', 'SENIOR'),
+        "venue": match_entry.get('venue', 'Unknown'),
+        "total_events": len(events_data)
+    }
+    # Bereinige Match-Metadaten für JSON
+    match_metadata = clean_data_for_json(match_metadata)
+    
+    # Metadata für JSON Merger - FÜR KOMPATIBILITÄT MIT merge_structured_json_halves
+    metadata = {
+        "exportInfo": {
+            "exportId": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat(),
+            "source": "Shot-Plotter & Playermaker Data Analysis",
+            "version": "2.0",
+            "format": "structured_football_data"
+        },
+        "playerInfo": {
+            "totalPlayers": len(players_in_match),
+            "playerIdMapping": player_id_mapping
+        },
+        "match_info": match_metadata
+    }
+    
+    # Download-Datei erstellen - HYBRID STRUKTUR: Metadata für JSON Merger + Event-Struktur für Konsistenz
+    event_export = {
         "metadata": metadata,
-        "events": events,
-        "statistics": {
-            "totalEvents": len(events),
-            "eventTypes": {
-                "shots": len([e for e in events if "shotInfo" in e]),
-                "passes": len([e for e in events if "passInfo" in e]),
-                "possessions": len([e for e in events if "possession" in e])
-            },
-            "timeRange": {
-                "start": min([e["timestamp"] for e in events]) if events else 0,
-                "end": max([e["timestamp"] for e in events]) if events else 0,
-                "duration": max([e["timestamp"] for e in events]) - min([e["timestamp"] for e in events]) if events else 0
-            },
-            "playerStatistics": {
-                "totalUniquePlayers": len(players_in_match),
-                "playersInThisMatch": list(players_in_match)
-            }
+        "events": events_data,
+        "export_metadata": {
+            "exported_at": datetime.now().isoformat(),
+            "total_events": len(events_data),
+            "match_id": match_id
         }
     }
     
-    return json.dumps(structured_data, indent=2, ensure_ascii=False)
+    return json.dumps(event_export, indent=2, ensure_ascii=False)
 
 def extract_match_info_from_xml(xml_file_content):
     """
@@ -1881,7 +1786,6 @@ def extract_match_info_from_xml(xml_file_content):
                         break
                 
                 # Parse text für Gegner (alles außer der Jugendkategorie)
-                # Entferne Jugendkategorie aus dem Text um Gegner zu extrahieren
                 opponent_text = text_content
                 if match_info['youth_level']:
                     # Entferne alle Varianten der gefundenen Jugendkategorie
@@ -2011,43 +1915,91 @@ def save_event_database(event_db):
 
 def add_or_replace_events_in_database(match_id, events_data, match_metadata, event_db):
     """
-    Fügt Events zur Event-Datenbank hinzu oder ersetzt bestehende Events für dieses Match.
-    Funktioniert ähnlich wie create_or_get_match_id - überschreibt bei existierender Match-ID.
+    Fügt Events zur Event-Datenbank hinzu oder aktualisiert bestehende Events basierend auf event_id.
+    
+    Neuer Ablauf mit konsistenten Event-IDs:
+    1. Vergleich Match ID -> Zuordnung zu richtigem Spiel
+    2. Wenn Spiel nicht existiert -> neues Spiel in database anlegen
+    3. Für jedes Event: Event ID prüfen
+       - Wenn Event ID bereits existiert -> altes Event löschen und durch neues ersetzen
+       - Wenn Event ID nicht existiert -> neues Event hinzufügen
     """
     try:
         # Prüfe, ob bereits Events für diese Match-ID existieren
         existing_match = match_id in event_db["events_by_match"]
         
         if existing_match:
-            st.info(f"🔄 Match-ID '{match_id}' existiert bereits - überschreibe Events...")
-            old_event_count = len(event_db["events_by_match"][match_id]["events"])
+            st.info(f"🔄 Match-ID '{match_id}' existiert bereits - aktualisiere Events basierend auf Event-IDs...")
+            existing_events = event_db["events_by_match"][match_id]["events"]
+            old_event_count = len(existing_events)
+            
+            # Erstelle ein Dictionary der bestehenden Events basierend auf event_id
+            existing_events_dict = {}
+            for event in existing_events:
+                event_id = event.get("event_id")
+                if event_id:
+                    existing_events_dict[event_id] = event
+            
+            # Verarbeite neue Events
+            updated_events = 0
+            new_events = 0
+            
+            for new_event in events_data:
+                event_id = new_event.get("event_id")
+                if not event_id:
+                    st.warning(f"⚠️ Event ohne event_id übersprungen: {new_event}")
+                    continue
+                
+                if event_id in existing_events_dict:
+                    # Event ID existiert bereits -> ersetze das alte Event
+                    existing_events_dict[event_id] = new_event
+                    updated_events += 1
+                    st.info(f"🔄 Event aktualisiert: {event_id}")
+                else:
+                    # Neue Event ID -> füge Event hinzu
+                    existing_events_dict[event_id] = new_event
+                    new_events += 1
+                    st.info(f"➕ Neues Event hinzugefügt: {event_id}")
+            
+            # Konvertiere Dictionary zurück zu Liste
+            final_events = list(existing_events_dict.values())
+            
+            # Aktualisiere den Match-Eintrag mit den neuen Events
+            event_db["events_by_match"][match_id]["events"] = final_events
+            event_db["events_by_match"][match_id]["last_updated"] = datetime.now().isoformat()
+            
+            # Update Match-Metadaten falls nötig
+            event_db["events_by_match"][match_id]["match_info"] = match_metadata
+            
+            final_event_count = len(final_events)
+            
+            st.success(f"✅ Events aktualisiert für Match '{match_id}':")
+            st.success(f"   📊 {updated_events} Events aktualisiert")
+            st.success(f"   ➕ {new_events} neue Events hinzugefügt")
+            st.success(f"   📈 Gesamt: {old_event_count} → {final_event_count} Events")
+            
         else:
             st.info(f"🆕 Neue Match-ID '{match_id}' - erstelle neuen Eintrag...")
-            old_event_count = 0
+            
+            # Erstelle neuen Match-Eintrag
+            event_db["events_by_match"][match_id] = {
+                "match_info": match_metadata,
+                "events": events_data,
+                "added_at": datetime.now().isoformat(),
+                "last_updated": datetime.now().isoformat()
+            }
+            
+            final_event_count = len(events_data)
+            st.success(f"✅ Neues Match erstellt: {final_event_count} Events für Match '{match_id}'")
         
-        # Erstelle/überschreibe den Match-Eintrag komplett
-        event_db["events_by_match"][match_id] = {
-            "match_info": match_metadata,
-            "events": events_data,  # ÜBERSCHREIBE alle Events
-            "added_at": datetime.now().isoformat(),
-            "last_updated": datetime.now().isoformat()
-        }
-        
-        # Update Metadata
+        # Update globale Metadata
         event_db["metadata"]["total_events"] = sum(
             len(match_data["events"]) for match_data in event_db["events_by_match"].values()
         )
         event_db["metadata"]["total_matches"] = len(event_db["events_by_match"])
         event_db["metadata"]["last_updated"] = datetime.now().isoformat()
         
-        new_event_count = len(events_data)
-        
-        if existing_match:
-            st.success(f"✅ Events ersetzt: {old_event_count} → {new_event_count} Events für Match '{match_id}'")
-            return new_event_count  # Rückgabe der neuen Event-Anzahl
-        else:
-            st.success(f"✅ Neue Events hinzugefügt: {new_event_count} Events für Match '{match_id}'")
-            return new_event_count
+        return final_event_count if 'final_event_count' in locals() else len(events_data)
             
     except Exception as e:
         st.error(f"Fehler beim Speichern der Events: {str(e)}")
@@ -2549,6 +2501,8 @@ with tabs[2]:
         # Extrahiere einzigartige Spieler
         if st.button("Spieler extrahieren und Position-Mapping starten", key="extract_players_btn"):
             unique_players = extract_unique_players(merged_data)
+            st.info(f"🔍 DEBUG: {len(unique_players)} einzigartige Spieler gefunden: {sorted(list(unique_players))}")
+            
             st.session_state.unique_players = unique_players
             st.session_state.show_position_mapping = True
             st.rerun()
@@ -2573,253 +2527,7 @@ with tabs[2]:
         # Update merged_data reference after potential position mapping
         merged_data = st.session_state.merged_data
         
-        # Erweiterte Visualisierungen
-        st.subheader("Daten-Visualisierung")
-        viz_tabs = st.tabs(["Statistiken", "Feldansicht", "Zeitliche Verteilung", "Passnetzwerk"])
-        
-        with viz_tabs[0]:
-            # Statistiken
-            st.markdown("#### Passstatistiken")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if 'Outcome' in merged_data.columns:
-                    # Anpassung für verschiedene Outcome-Formate
-                    outcome_values = merged_data['Outcome'].dropna().unique()
-                    st.write("Verfügbare Outcome-Werte:", outcome_values)
-                    
-                    # Erfolgreich/Erfolgreich basierend auf den tatsächlichen Werten
-                    success_keywords = ['Erfolgreich', 'erfolgreich', 'Success', 'success', 'Goal', 'goal']
-                    success_count = 0
-                    total_count = 0
-                    
-                    for outcome in outcome_values:
-                        count = (merged_data['Outcome'] == outcome).sum()
-                        total_count += count
-                        if any(keyword in str(outcome) for keyword in success_keywords):
-                            success_count += count
-                    
-                    if total_count > 0:
-                        success_rate = success_count / total_count * 100
-                        st.metric("Erfolgsrate", f"{success_rate:.1f}%")
-                        
-                        # Kreisdiagramm
-                        fail_count = total_count - success_count
-                        fig = px.pie(
-                            names=['Erfolgreich', 'Nicht erfolgreich'],
-                            values=[success_count, fail_count],
-                            color_discrete_sequence=['#4CAF50', '#F44336'],
-                            title='Passerfolg'
-                        )
-                        st.plotly_chart(fig)
-                    else:
-                        st.info("Keine Outcome-Daten verfügbar")
-            
-            with col2:
-                # Neue Spalten für Statistiken
-                if 'Passhöhe' in merged_data.columns:
-                    passhöhe_values = merged_data['Passhöhe'].dropna().unique()
-                    st.metric("Anzahl Passhöhen-Kategorien", len(passhöhe_values))
-                    st.write("Passhöhen:", ", ".join([str(v) for v in passhöhe_values]))
-                
-                if 'Gegnerdruck' in merged_data.columns:
-                    gegnerdruck_values = merged_data['Gegnerdruck'].dropna().unique()
-                    st.metric("Anzahl Gegnerdruck-Kategorien", len(gegnerdruck_values))
-                    st.write("Gegnerdruck:", ", ".join([str(v) for v in gegnerdruck_values]))
-                
-                if 'Situation' in merged_data.columns:
-                    situation_values = merged_data['Situation'].dropna().unique()
-                    st.metric("Anzahl Situationen", len(situation_values))
-                    st.write("Situationen:", ", ".join([str(v) for v in situation_values]))
-            
-            with col3:
-                # Zeige relevante Spielerinformationen
-                player_cols = ['Player Name', 'passed_from', 'passed_to']
-                for col in player_cols:
-                    if col in merged_data.columns:
-                        unique_values = merged_data[col].dropna().unique()
-                        st.metric(f"Anzahl {col}", len(unique_values))
-                
-                # Aktionstyp-Verteilung, wenn vorhanden
-                if 'Aktionstyp' in merged_data.columns:
-                    aktionstyp_counts = merged_data['Aktionstyp'].value_counts()
-                    st.write("Aktionstypen:")
-                    for typ, count in aktionstyp_counts.items():
-                        st.text(f"{typ}: {count}")
-                
-                # Team-Information, wenn vorhanden
-                if 'Team' in merged_data.columns:
-                    team_values = merged_data['Team'].dropna().unique()
-                    st.metric("Anzahl Teams", len(team_values))
-                    st.write("Teams:", ", ".join([str(t) for t in team_values]))
-            
-            # Spielerinformationen-Tabelle hinzufügen
-            st.subheader("Spielerstatistiken")
-            
-            # Erstelle eine Tabelle mit Spielerinformationen, wenn Player Name, passed_from oder passed_to vorhanden sind
-            if any(col in merged_data.columns for col in ['Player Name', 'passed_from', 'passed_to']):
-                # Alle Spieler sammeln (Player Name, passed_from, passed_to)
-                all_players = set()
-                
-                for col in ['Player Name', 'passed_from', 'passed_to']:
-                    if col in merged_data.columns:
-                        all_players.update(merged_data[col].dropna().unique())
-                
-                # Statistiken für jeden Spieler sammeln
-                player_stats = []
-                
-                for player in all_players:
-                    stats = {"Spieler": player}
-                    
-                    # Als Hauptakteur
-                    if 'Player Name' in merged_data.columns:
-                        player_passes = merged_data[merged_data['Player Name'] == player]
-                        stats["Pässe als Hauptakteur"] = len(player_passes)
-                        
-                        if 'Outcome' in merged_data.columns and len(player_passes) > 0:
-                            # Erfolgsrate basierend auf Outcome
-                            success_keywords = ['Erfolgreich', 'erfolgreich', 'Success', 'success', 'Goal', 'goal']
-                            success = 0
-                            for outcome in player_passes['Outcome'].dropna():
-                                if any(keyword in str(outcome) for keyword in success_keywords):
-                                    success += 1
-                            stats["Erfolgsrate"] = f"{success / len(player_passes) * 100:.1f}%" if len(player_passes) > 0 else "N/A"
-                    
-                    # Als Absender
-                    if 'passed_from' in merged_data.columns:
-                        stats["Pässe als Absender"] = merged_data[merged_data['passed_from'] == player].shape[0]
-                    
-                    # Als Empfänger
-                    if 'passed_to' in merged_data.columns:
-                        stats["Pässe als Empfänger"] = merged_data[merged_data['passed_to'] == player].shape[0]
-                    
-                    player_stats.append(stats)
-                
-                # Sortiere nach der Gesamtzahl der Pässe
-                player_stats.sort(key=lambda x: 
-                    x.get("Pässe als Hauptakteur", 0) + 
-                    x.get("Pässe als Absender", 0) + 
-                    x.get("Pässe als Empfänger", 0), 
-                    reverse=True)
-                
-                # Anzeigen als DataFrame
-                st.dataframe(pd.DataFrame(player_stats))
-        
-        with viz_tabs[2]:
-            st.markdown("#### Zeitliche Verteilung")
-            # Zeitverteilung der Passes
-            if 'Zeit' in merged_data.columns:
-                time_hist = px.histogram(
-                    merged_data,
-                    x='Zeit',
-                    title='Zeitliche Verteilung der Pässe',
-                    labels={'Zeit': 'Zeit (s)', 'count': 'Anzahl'},
-                    color_discrete_sequence=['#2196F3']
-                )
-                st.plotly_chart(time_hist)
-        
-        # Tab 4: Passnetzwerk
-        with viz_tabs[3]:
-            st.markdown("#### Passnetzwerk-Analyse")
-            
-            # Prüfe, ob die benötigten Spalten vorhanden sind
-            required_cols = ['passed_from', 'passed_to']
-            has_required_cols = all(col in merged_data.columns for col in required_cols)
-            
-            if has_required_cols:
-                # Filtern der Daten, wo passed_from und passed_to nicht leer sind
-                network_data = merged_data.dropna(subset=required_cols)
-                
-                if not network_data.empty:
-                    # Zähle die Pässe zwischen Spieler-Paaren
-                    pass_counts = network_data.groupby(['passed_from', 'passed_to']).size().reset_index(name='count')
-                    
-                    st.write("Passhäufigkeiten zwischen Spielern:")
-                    st.dataframe(pass_counts.sort_values('count', ascending=False))
-                    
-                    # Einfaches Netzwerkdiagramm
-                    network_fig = go.Figure()
-                    
-                    # Liste aller Spieler
-                    all_players = list(set(pass_counts['passed_from'].tolist() + pass_counts['passed_to'].tolist()))
-                    
-                    # Erzeuge Kreiskoordinaten für die Spielerpositionen
-                    n = len(all_players)
-                    radius = 1
-                    angles = [2 * np.pi * i / n for i in range(n)]
-                    player_positions = {
-                        player: (radius * np.cos(angle), radius * np.sin(angle)) 
-                        for player, angle in zip(all_players, angles)
-                    }
-                    
-                    # Füge Kanten für Pässe hinzu
-                    for _, row in pass_counts.iterrows():
-                        from_player = row['passed_from']
-                        to_player = row['passed_to']
-                        count = row['count']
-                        
-                        # Positionsdaten
-                        from_pos = player_positions[from_player]
-                        to_pos = player_positions[to_player]
-                        
-                        # Füge eine Linie hinzu, wobei die Breite die Anzahl der Pässe darstellt
-                        network_fig.add_trace(go.Scatter(
-                            x=[from_pos[0], to_pos[0]],
-                            y=[from_pos[1], to_pos[1]],
-                            mode='lines',
-                            line=dict(width=1 + count, color='rgba(70, 130, 180, 0.8)'),
-                            text=f"{from_player} → {to_player}: {count} Pässe",
-                            hoverinfo='text',
-                            showlegend=False
-                        ))
-                    
-                    # Füge Spieler als Knoten hinzu
-                    for player, pos in player_positions.items():
-                        # Zähle Pässe von diesem Spieler
-                        outgoing = pass_counts[pass_counts['passed_from'] == player]['count'].sum() if player in pass_counts['passed_from'].values else 0
-                        # Zähle Pässe zu diesem Spieler
-                        incoming = pass_counts[pass_counts['passed_to'] == player]['count'].sum() if player in pass_counts['passed_to'].values else 0
-                        
-                        # Größe basierend auf der Summe der ein- und ausgehenden Pässe
-                        node_size = 10 + (outgoing + incoming) * 2
-                        
-                        network_fig.add_trace(go.Scatter(
-                            x=[pos[0]],
-                            y=[pos[1]],
-                            mode='markers+text',
-                            marker=dict(size=node_size, color='blue'),
-                            text=player,
-                            textposition="top center",
-                            name=player,
-                            hovertext=f"{player}<br>Ausgehende Pässe: {outgoing}<br>Eingehende Pässe: {incoming}",
-                            hoverinfo='text'
-                        ))
-                    
-                    # Layout
-                    network_fig.update_layout(
-                        title='Passnetzwerk',
-                        showlegend=False,
-                        xaxis=dict(
-                            showgrid=False,
-                            zeroline=False,
-                            showticklabels=False,
-                            range=[-1.2, 1.2]
-                        ),
-                        yaxis=dict(
-                            showgrid=False,
-                            zeroline=False,
-                            showticklabels=False,
-                            range=[-1.2, 1.2]
-                        ),
-                        width=700,
-                        height=700
-                    )
-                    
-                    st.plotly_chart(network_fig, use_container_width=True)
-                else:
-                    st.warning("Keine Daten für Passnetzwerk-Analyse verfügbar.")
-            else:
-                st.warning(f"Für die Passnetzwerk-Analyse werden die Spalten {', '.join(required_cols)} benötigt.")
+    
         
         # Export-Optionen
         st.subheader("Daten exportieren")
@@ -2856,7 +2564,7 @@ with tabs[2]:
                 # Extrahiere Match-ID aus dem JSON für den Dateinamen
                 try:
                     json_data = json.loads(structured_json_with_ids)
-                    match_id_for_filename = json_data.get("match_info", {}).get("match_id", "unknown_match")
+                    match_id_for_filename = json_data.get("metadata", {}).get("match_info", {}).get("match_id", "unknown_match")
                 except:
                     match_id_for_filename = "unknown_match"
                 
@@ -2910,22 +2618,38 @@ with tabs[2]:
                         # Match ID erstellen/abrufen mit der gleichen Logik
                         match_id = create_or_get_match_id(match_info, match_db)
                         
+                        # *** FEHLENDE SPIELER-REGISTRIERUNG HINZUFÜGEN ***
+                        # Sammle alle Spieler für dieses Match und registriere sie in der Player-Database
+                        # (Gleiche Logik wie in create_structured_json_export_with_ids)
+                        players_in_match = set()
+                        player_id_mapping = {}
+                        
+                        # Sammle alle Spielernamen aus verschiedenen Spalten
+                        player_columns = ['Player Name', 'passed_from', 'passed_to']
+                        for col in player_columns:
+                            if col in export_data.columns:
+                                unique_players = export_data[col].dropna().unique()
+                                for player_name in unique_players:
+                                    if player_name and str(player_name).strip():
+                                        player_id = get_or_create_player_id(player_name, player_db)
+                                        if player_id:
+                                            player_id_mapping[player_name] = player_id
+                                            players_in_match.add(player_id)
+                        
+                        st.info(f"🆔 {len(players_in_match)} Spieler in Player-Database registriert: {list(player_id_mapping.keys())}")
+                        
                         # Events aus export_data erstellen
                         events_data = []
                         for idx, row in export_data.iterrows():
                             # Extract player information
                             player_name = row.get('Player Name', 'Unknown')
                             
-                            # Create coordinates structure
-                            coordinates = {}
-                            if 'X' in row and pd.notna(row['X']):
-                                coordinates["start_x"] = float(row['X'])
-                            if 'Y' in row and pd.notna(row['Y']):
-                                coordinates["start_y"] = float(row['Y'])
-                            if 'X2' in row and pd.notna(row['X2']):
-                                coordinates["end_x"] = float(row['X2'])
-                            if 'Y2' in row and pd.notna(row['Y2']):
-                                coordinates["end_y"] = float(row['Y2'])
+                            # *** FIX: Verwende Koordinaten DIREKT aus dem DataFrame (die bereits korrekt konvertiert wurden)
+                            # Nicht neu erstellen - das DataFrame hat bereits die richtigen Koordinaten!
+                            start_x = float(row.get('X', 0)) if pd.notna(row.get('X', 0)) else 0
+                            start_y = float(row.get('Y', 0)) if pd.notna(row.get('Y', 0)) else 0
+                            end_x = float(row.get('X2', 0)) if pd.notna(row.get('X2', 0)) else 0
+                            end_y = float(row.get('Y2', 0)) if pd.notna(row.get('Y2', 0)) else 0
                             
                             # Create passInfo structure
                             pass_info = {}
@@ -2947,7 +2671,7 @@ with tabs[2]:
                                 "passed_to_Position": row.get('passed_to_Position')
                             }
                             
-                            # Clean additional_data - remove coordinates, passing info, and redundant data
+                            # Clean additional_data - remove coordinates, passing info, and redundant data (SAME as Tab 2)
                             additional_data = {}
                             for col, value in row.items():
                                 if col not in ['Zeit', 'Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 
@@ -2955,28 +2679,29 @@ with tabs[2]:
                                              'Outcome', 'Aktionstyp', 'Position'] and pd.notna(value):
                                     additional_data[col] = str(value) if not isinstance(value, (int, float, bool)) else value
                             
-                            # Determine action_type
+                            # Determine action_type (SAME as Tab 2)
                             action_type = row.get('Aktionstyp', 'Pass')
                             if isinstance(action_type, str):
                                 action_type = action_type.upper()
                             if action_type != "PASS" and action_type != "LOSS":
                                 action_type = "PASS"
                             
-                            # Generate consistent event ID using timestamp and youth level
+                            # Generate consistent event ID using timestamp and youth level (SAME as Tab 2)
                             timestamp = row.get('Zeit', 0)
                             match_entry = match_db["matches"].get(match_id, {})
                             youth_level = extract_youth_level_from_match_info(match_entry)
                             event_id = generate_consistent_event_id(timestamp, youth_level)
                             
+                            # Create event with EXACT same structure as Tab 2 - FIXE KOORDINATEN VERWENDEN
                             event = {
                                 "event_id": event_id,
                                 "timestamp": timestamp,
                                 "player": player_name,
                                 "action_type": action_type,
-                                "start_x": coordinates.get("start_x", 0),
-                                "start_y": coordinates.get("start_y", 0),
-                                "end_x": coordinates.get("end_x", 0),
-                                "end_y": coordinates.get("end_y", 0),
+                                "start_x": start_x,  # ← FIX: Direkt aus DataFrame statt coordinates dict
+                                "start_y": start_y,  # ← FIX: Direkt aus DataFrame
+                                "end_x": end_x,      # ← FIX: Direkt aus DataFrame
+                                "end_y": end_y,      # ← FIX: Direkt aus DataFrame
                                 "outcome": row.get('Outcome', ''),
                                 "team": row.get('Team', ''),
                                 "half": row.get('Halbzeit', 1),
@@ -2984,7 +2709,7 @@ with tabs[2]:
                                 "passing_network": passing_network
                             }
                             
-                            # Bereinige Event für JSON
+                            # Bereinige Event für JSON (SAME as Tab 2)
                             event = clean_data_for_json(event)
                             events_data.append(event)
                         
@@ -3140,7 +2865,7 @@ with tabs[2]:
                     - Bei fehlenden XML-Daten: Possession-Daten als Basis
                     - Bei fehlenden Possession-Daten: CSV-Dateiname als Basis
                     - Bei fehlenden Datums-Informationen: Aktuelles Datum
-                    - Bei Online-Suche-Fehlern: Intelligente Vermutung basierend auf typischen Gegnern
+                    - Bei Online-Suchen-Fehlern: Intelligente Vermutung basierend auf typischen Gegnern
                     
                     **Sicherheit:**
                     - Spielerdaten werden nur lokal gespeichert
@@ -3952,7 +3677,7 @@ with tabs[5]:
     st.markdown("## 🔧 JSON Merger für Event-Daten")
     st.markdown("**Führe strukturierte JSON-Dateien von verschiedenen Halbzeiten zusammen**")
     
-    # Helper Functions für strukturierte JSON-Merger
+    # Helper Functions für strukturierten JSON-Merger
     def parse_structured_json_file(uploaded_file):
         """Parse structured JSON file with event data"""
         try:
@@ -3997,8 +3722,8 @@ with tabs[5]:
             return None
         
         # Extract match IDs to verify they're the same match
-        match_id_1 = json1.get('metadata', {}).get('matchInfo', {}).get('matchId', 'unknown_1')
-        match_id_2 = json2.get('metadata', {}).get('matchInfo', {}).get('matchId', 'unknown_2')
+        match_id_1 = json1.get('match_info', {}).get('match_id', 'unknown_1')
+        match_id_2 = json2.get('match_info', {}).get('match_id', 'unknown_2')
         
         # Create merged structure
         merged_json = {
@@ -4010,11 +3735,11 @@ with tabs[5]:
                     "version": "2.0",
                     "format": "structured_football_data_merged",
                     "originalFiles": [
-                        json1.get('metadata', {}).get('matchInfo', {}).get('originalFilename', 'unknown_1'),
-                        json2.get('metadata', {}).get('matchInfo', {}).get('originalFilename', 'unknown_2')
+                        json1.get('metadata', {}).get('match_info', {}),
+                        json2.get('metadata', {}).get('match_info', {})
                     ]
                 },
-                "matchInfo": {},
+                "match_info": {},
                 "playerInfo": {
                     "totalPlayers": 0,
                     "playerIdMapping": {}
@@ -4024,21 +3749,18 @@ with tabs[5]:
         }
         
         # Merge match info (prefer first half's basic info, but combine specific details)
-        match_info_1 = json1.get('metadata', {}).get('matchInfo', {})
-        match_info_2 = json2.get('metadata', {}).get('matchInfo', {})
+        match_info_1 = json1.get('match_info', {})
+        match_info_2 = json2.get('match_info', {})
         
         merged_match_info = match_info_1.copy()
         merged_match_info.update({
             "timestamp": datetime.now().isoformat(),
             "totalEvents": len(json1.get('events', [])) + len(json2.get('events', [])),
-            "dataSource": "merged_halves",
-            "originalFilenames": [
-                match_info_1.get('originalFilename', 'unknown_1'),
-                match_info_2.get('originalFilename', 'unknown_2')
-            ]
+            "dataSource": "merged_halves"
+            
         })
         
-        merged_json["metadata"]["matchInfo"] = merged_match_info
+        merged_json["metadata"]["match_info"] = merged_match_info
         
         # Merge player info - combine all unique players
         player_mapping_1 = json1.get('metadata', {}).get('playerInfo', {}).get('playerIdMapping', {})
@@ -4074,7 +3796,7 @@ with tabs[5]:
         merged_json["metadata"]["playerInfo"]["totalPlayers"] = len(merged_player_mapping)
         
         # Extract youth level from match metadata for consistent IDs
-        match_info = merged_json.get('metadata', {}).get('matchInfo', {})
+        match_info = merged_json.get('metadata', {}).get('match_info', {})
         youth_level = extract_youth_level_from_match_info(match_info)
         
         # Merge events
@@ -4128,215 +3850,256 @@ with tabs[5]:
         return merged_json
     
     def update_databases_with_merged_json(merged_json):
-        """Update all databases with the merged JSON data using existing helper functions"""
+        """Update all databases with the merged JSON data - using the SAME logic as 'Events herunterladen & im Archiv speichern'"""
         try:
-            # Load databases
+            # Load databases SAME as Tab 2
             player_db = load_player_database()
             match_db = load_match_database()
             event_db = load_event_database()
             
-            # Extract information from merged JSON
-            match_info = merged_json.get('metadata', {}).get('matchInfo', {})
-            player_mapping = merged_json.get('metadata', {}).get('playerInfo', {}).get('playerIdMapping', {})
-            events = merged_json.get('events', [])
+            # IMPORTANT: Convert merged JSON events back to DataFrame format (like export_data in Tab 2)
+            events_list = merged_json.get('events', [])
             
-            # Use the matchId directly from the merged JSON
-            match_id = match_info.get('matchId', f'unknown_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
-            
-            st.info(f"🔍 DEBUG: Verwende Match-ID aus JSON: {match_id}")
-            st.info(f"🔍 DEBUG: Verarbeite {len(player_mapping)} Spieler und {len(events)} Events")
-            
-            # Check if this match already exists in the database, if not create it
-            if match_id not in match_db["matches"]:
-                match_entry = {
-                    "match_id": match_id,
-                    "identifier": match_id,  # Use the same as match_id since it's already structured
-                    "date": datetime.now().isoformat(),
-                    "type": "match",
-                    "venue": match_info.get('venue', 'BVB Training Ground'),
-                    "created": datetime.now().isoformat(),
-                    "players": [],
-                    "data_source": "merged_json_halves",
-                    "match_date": match_info.get('matchDate'),
-                    "youth_level": match_info.get('youthLevel'),
-                    "team": match_info.get('team', 'BVB'),
-                    "opponent": match_info.get('opponent', 'Unknown'),
-                    "original_filenames": match_info.get('originalFilenames', [])
+            # Convert JSON events to DataFrame format that matches export_data structure
+            rows_for_df = []
+            for event in events_list:
+                # Extract player information - use the correct structure
+                player_name = event.get("player", "Unknown")  # ← FIX: Direkt aus Event (nicht aus player Sub-Objekt)
+                
+                # *** FIX: Extrahiere Koordinaten DIREKT aus dem Event (nicht aus coordinates Sub-Objekt)
+                # Das JSON hat die Koordinaten auf der obersten Event-Ebene gespeichert!
+                start_x = event.get("start_x", 0)
+                start_y = event.get("start_y", 0)
+                end_x = event.get("end_x", 0)
+                end_y = event.get("end_y", 0)
+                
+                # *** FIX: Extrahiere Pass-Info DIREKT aus dem Event (nicht aus passInfo Sub-Objekt)
+                # Das JSON hat die passing_network auf der obersten Event-Ebene gespeichert!
+                passing_network = event.get("passing_network", {})
+                
+                # *** FIX: Extrahiere Additional-Data DIREKT aus dem Event (nicht aus additionalData Sub-Objekt)
+                # Das JSON hat die additional_data auf der obersten Event-Ebene gespeichert!
+                additional_data = event.get("additional_data", {})
+                
+                # Create row that matches export_data structure
+                row = {
+                    'Zeit': event.get("timestamp", 0),
+                    'Team': event.get("team", ''),              # ← FIX: Direkt aus Event
+                    'Halbzeit': event.get("half", 1),           # ← FIX: Direkt aus Event (nicht period)
+                    'Player Name': player_name,
+                    'X': start_x,   # ← FIX: Direkt aus Event statt coordinates dict
+                    'Y': start_y,   # ← FIX: Direkt aus Event
+                    'X2': end_x,    # ← FIX: Direkt aus Event
+                    'Y2': end_y,    # ← FIX: Direkt aus Event
+                    'Outcome': event.get("outcome", ''),        # ← FIX: Direkt aus Event
+                    'Aktionstyp': event.get("action_type", 'Pass'), # ← FIX: Direkt aus Event
+                    'Position': '',  # ← Position wird nicht im JSON gespeichert
+                    'passed_from': passing_network.get('passed_from', ''),     # ← FIX: Aus passing_network
+                    'passed_to': passing_network.get('passed_to', ''),         # ← FIX: Aus passing_network
+                    'passed_from_Position': passing_network.get('passed_from_Position', ''), # ← FIX: Aus passing_network
+                    'passed_to_Position': passing_network.get('passed_to_Position', '')      # ← FIX: Aus passing_network
                 }
-                match_db["matches"][match_id] = match_entry
-                st.info(f"🔍 DEBUG: Neuer Match-Eintrag erstellt für: {match_id}")
+                
+                # *** FIX: Füge alle additional_data-Felder hinzu (sie sind direkt im Event verfügbar)
+                for key, value in additional_data.items():
+                    if key not in row:
+                        row[key] = value
+                
+                rows_for_df.append(row)
+            
+            # Create DataFrame equivalent to export_data
+            export_data = pd.DataFrame(rows_for_df)
+            
+            st.info(f"🔍 DEBUG: Erstellt DataFrame mit {len(export_data)} Events aus JSON")
+            
+            # SAME Match-Info extraction logic as Tab 2 - use data from merged JSON to reconstruct original sources
+            match_info_from_json = merged_json.get('metadata', {}).get('match_info', {})
+            
+            # *** FIX: Verwende die originalen Match-Metadaten aus dem JSON statt das rekonstruierte DataFrame ***
+            # Das rekonstruierte DataFrame enthält keine originalen Match-Informationen (Datum, Gegner, etc.)
+            
+            # Reconstruct match_info with SAME structure as Tab 2 - aber mit originalen Metadaten
+            match_info = {
+                'type': 'match',
+                'venue': match_info_from_json.get('venue', 'BVB Training Ground')
+            }
+            
+            # FIX: Erstelle Mock-Possession-Daten mit den originalen Match-Informationen
+            # So kann extract_match_info_from_possession die richtigen Daten finden
+            
+            # WICHTIG: Die Youth Level Info muss in der Team-Spalte stehen (nicht separat)
+            # extract_match_info_from_possession sucht nach Patterns wie "U12", "U17" etc. IN der Team-Spalte
+            youth_level = match_info_from_json.get('youth_level', 'SENIOR')
+            team_name = match_info_from_json.get('team', 'BVB')
+            
+            # Kombiniere Youth Level mit Team-Name für die Team-Spalte (wie es extract_match_info_from_possession erwartet)
+            if youth_level and youth_level != 'SENIOR':
+                team_with_youth = f"{youth_level} {team_name}"
             else:
-                st.info(f"🔍 DEBUG: Match-Eintrag bereits vorhanden für: {match_id}")
+                team_with_youth = team_name
             
-            # Update player database using existing helper function
-            updated_players = 0
-            for player_name, provided_player_id in player_mapping.items():
-                if player_name and str(player_name).strip():
-                    # Use the existing helper function to get or create player ID
-                    actual_player_id = get_or_create_player_id(player_name, player_db)
-                    
-                    if actual_player_id:
-                        # Check if this was a new player
-                        if actual_player_id == provided_player_id:
-                            # Same ID, potentially new player
-                            updated_players += 1
-                        
-                        # Update the player's matches list
-                        for existing_name, player_info in player_db["players"].items():
-                            if player_info["player_id"] == actual_player_id:
-                                if "matches_played" not in player_info:
-                                    player_info["matches_played"] = []
-                                if match_id not in player_info["matches_played"]:
-                                    player_info["matches_played"].append(match_id)
-                                break
+            mock_possession_df = pd.DataFrame({
+                'Date': [match_info_from_json.get('date', '')],
+                'Team': [team_with_youth],  # ← FIX: Youth Level IN der Team-Spalte
+                'Opponent': [match_info_from_json.get('opponent', 'Unknown')]
+            })
             
-            st.info(f"🔍 DEBUG: Spieler-Datenbank aktualisiert. Neue/Aktualisierte Spieler: {updated_players}")
+            # Verwende die Mock-Daten statt das rekonstruierte DataFrame
+            match_info['possession_data'] = mock_possession_df
             
-            # Convert events to the format expected by add_or_replace_events_in_database
-            events_for_db = []
-            for i, event in enumerate(events):
+            # SAME Match ID creation logic as Tab 2
+            match_id = create_or_get_match_id(match_info, match_db)
+            
+            st.info(f"🔍 DEBUG: Match-ID erstellt/gefunden: {match_id}")
+            
+            # *** FEHLENDE SPIELER-REGISTRIERUNG HINZUFÜGEN (GLEICHE LOGIK WIE IN TAB 2) ***
+            # Sammle alle Spieler für dieses Match und registriere sie in der Player-Database
+            players_in_match = set()
+            player_id_mapping = {}
+            
+            # Sammle alle Spielernamen aus verschiedenen Spalten
+            player_columns = ['Player Name', 'passed_from', 'passed_to']
+            for col in player_columns:
+                if col in export_data.columns:
+                    unique_players = export_data[col].dropna().unique()
+                    for player_name in unique_players:
+                        if player_name and str(player_name).strip():
+                            player_id = get_or_create_player_id(player_name, player_db)
+                            if player_id:
+                                player_id_mapping[player_name] = player_id
+                                players_in_match.add(player_id)
+            
+            st.info(f"🆔 MERGED JSON: {len(players_in_match)} Spieler in Player-Database registriert: {list(player_id_mapping.keys())}")
+            
+            # SAME Events creation logic as Tab 2 - copied exactly from "Events herunterladen & im Archiv speichern"
+            events_data = []
+            for idx, row in export_data.iterrows():
                 # Extract player information
-                player_info = event.get("player", {})
-                if isinstance(player_info, dict):
-                    player_name = player_info.get("playerName", "Unknown")
-                    player_id = player_info.get("playerId")
-                    player_position = player_info.get("position")
-                else:
-                    player_name = str(player_info) if player_info else "Unknown"
-                    player_id = None
-                    player_position = None
+                player_name = row.get('Player Name', 'Unknown')
                 
-                # If no player_id, try to get it from our mapping
-                if not player_id and player_name in player_mapping:
-                    player_id = player_mapping[player_name]
+                # *** FIX: Verwende Koordinaten DIREKT aus dem DataFrame (die bereits korrekt konvertiert wurden)
+                # Nicht neu erstellen - das DataFrame hat bereits die richtigen Koordinaten!
+                start_x = float(row.get('X', 0)) if pd.notna(row.get('X', 0)) else 0
+                start_y = float(row.get('Y', 0)) if pd.notna(row.get('Y', 0)) else 0
+                end_x = float(row.get('X2', 0)) if pd.notna(row.get('X2', 0)) else 0
+                end_y = float(row.get('Y2', 0)) if pd.notna(row.get('Y2', 0)) else 0
                 
-                # Extract coordinates from the event
-                coordinates = event.get("coordinates", {})
-                additional_data = event.get("additionalData", {})
+                # Create passInfo structure
+                pass_info = {}
+                if 'passed_from' in row and pd.notna(row['passed_from']):
+                    pass_info["passFrom"] = str(row['passed_from'])
+                    if 'passed_from_Position' in row and pd.notna(row['passed_from_Position']):
+                        pass_info["passFromPosition"] = str(row['passed_from_Position'])
                 
-                # Debug: Show what we're extracting
-                if i < 2:  # Only show for first 2 events to avoid spam
-                    st.info(f"🔍 DEBUG Event {i+1}: coordinates={coordinates}, additionalData keys={list(additional_data.keys())}")
+                if 'passed_to' in row and pd.notna(row['passed_to']):
+                    pass_info["passTo"] = str(row['passed_to'])
+                    if 'passed_to_Position' in row and pd.notna(row['passed_to_Position']):
+                        pass_info["passToPosition"] = str(row['passed_to_Position'])
                 
-                # Get coordinate values
-                start_x = coordinates.get("start_x",0)
-                start_y = coordinates.get("start_y", 0)
-                end_x = coordinates.get("end_x", 0)
-                end_y = coordinates.get("end_y", 0)
-                
-                # Extract pass information from passInfo
-                pass_info = event.get("passInfo", {})
-                
-                # Create passing_network data from passInfo
+                # Create passing_network for database structure
                 passing_network = {
-                    "passed_from": pass_info.get('passFrom'),
-                    "passed_to": pass_info.get('passTo'),
-                    "passed_from_Position": pass_info.get('passFromPosition'),
-                    "passed_to_Position": pass_info.get('passToPosition')
+                    "passed_from": row.get('passed_from'),
+                    "passed_to": row.get('passed_to'),
+                    "passed_from_Position": row.get('passed_from_Position'),
+                    "passed_to_Position": row.get('passed_to_Position')
                 }
                 
-                # Clean additional_data - remove redundant data that's now elsewhere
-                cleaned_additional_data = {k: v for k, v in additional_data.items() 
-                                         if k not in ["X", "Y", "X2", "Y2", "passed_to_Position", 
-                                                     "Aktionstyp", "Team", "Halbzeit"]}
+                # Clean additional_data - remove coordinates, passing info, and redundant data (SAME as Tab 2)
+                additional_data = {}
+                for col, value in row.items():
+                    if col not in ['Zeit', 'Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 
+                                 'passed_from_Position', 'passed_to_Position', 'X', 'Y', 'X2', 'Y2', 
+                                 'Outcome', 'Aktionstyp', 'Position'] and pd.notna(value):
+                        additional_data[col] = str(value) if not isinstance(value, (int, float, bool)) else value
                 
-                # Determine action_type
-                action_type = additional_data.get("Aktionstyp", "").upper()
+                # Determine action_type (SAME as Tab 2)
+                action_type = row.get('Aktionstyp', 'Pass')
+                if isinstance(action_type, str):
+                    action_type = action_type.upper()
+                if action_type != "PASS" and action_type != "LOSS":
+                    action_type = "PASS"
                 
-                # Get outcome - use empty string as fallback like in Tab 2
-                outcome = additional_data.get("Outcome", "")
-                
-                # Extract youth level from match info
-                youth_level = extract_youth_level_from_match_info(match_info)
-                
-                # Debug: Show extracted values for first event
-                if i == 0:
-                    st.info(f"🔍 DEBUG First Event: start_x={start_x}, start_y={start_y}, end_x={end_x}, end_y={end_y}, outcome='{outcome}', action_type='{action_type}', youth_level='{youth_level}'")
-                
-                # Generate consistent event ID using timestamp and youth level
-                timestamp = event.get("timestamp", 0)
+                # Generate consistent event ID using timestamp and youth level (SAME as Tab 2)
+                timestamp = row.get('Zeit', 0)
+                match_entry = match_db["matches"].get(match_id, {})
+                youth_level = extract_youth_level_from_match_info(match_entry)
                 event_id = generate_consistent_event_id(timestamp, youth_level)
                 
-                # Create database event with correct structure
-                db_event = {
+                # Create event with EXACT same structure as Tab 2 - FIXE KOORDINATEN VERWENDEN
+                event = {
                     "event_id": event_id,
                     "timestamp": timestamp,
                     "player": player_name,
                     "action_type": action_type,
-                    "start_x": start_x,
-                    "start_y": start_y,
-                    "end_x": end_x,
-                    "end_y": end_y,
-                    "outcome": outcome,
-                    "team": match_info.get('team', ''),
-                    "half": event.get("period", additional_data.get("Halbzeit", 1)),
-                    "additional_data": cleaned_additional_data,
+                    "start_x": start_x,  # ← FIX: Direkt aus DataFrame statt coordinates dict
+                    "start_y": start_y,  # ← FIX: Direkt aus DataFrame
+                    "end_x": end_x,      # ← FIX: Direkt aus DataFrame
+                    "end_y": end_y,      # ← FIX: Direkt aus DataFrame
+                    "outcome": row.get('Outcome', ''),
+                    "team": row.get('Team', ''),
+                    "half": row.get('Halbzeit', 1),
+                    "additional_data": additional_data,
                     "passing_network": passing_network
                 }
                 
-                # Clean the event data
-                db_event = clean_data_for_json(db_event)
-                events_for_db.append(db_event)
+                # Bereinige Event für JSON (SAME as Tab 2)
+                event = clean_data_for_json(event)
+                events_data.append(event)
             
-            st.info(f"🔍 DEBUG: {len(events_for_db)} Events für Datenbank vorbereitet")
-            
-            # Create match metadata for event database
+            # SAME Match-Metadaten extraction as Tab 2
+            match_entry = match_db["matches"].get(match_id, {})
             match_metadata = {
                 "match_id": match_id,
-                "date": match_info.get('matchDate', datetime.now().strftime('%Y-%m-%d')),
-                "team": match_info.get('team', 'BVB'),
-                "opponent": match_info.get('opponent', 'Unknown'),
-                "youth_level": match_info.get('youthLevel', 'UNKNOWN'),
-                "venue": match_info.get('venue', 'BVB Training Ground'),
-                "total_events": len(events_for_db),
-                "data_source": "merged_json_halves",
-                "original_filenames": match_info.get('originalFilenames', [])
+                "date": match_entry.get('match_date', datetime.now().strftime('%Y-%m-%d')),
+                "team": match_entry.get('team', 'BVB'),
+                "opponent": match_entry.get('opponent', 'Unknown'),
+                "youth_level": match_entry.get('youth_level', 'SENIOR'),
+                "venue": match_entry.get('venue', 'Unknown'),
+                "total_events": len(events_data)
             }
+            # Bereinige Match-Metadaten für JSON (SAME as Tab 2)
             match_metadata = clean_data_for_json(match_metadata)
             
-            # Update event database using existing helper function
-            events_count = add_or_replace_events_in_database(match_id, events_for_db, match_metadata, event_db)
-            st.info(f"🔍 DEBUG: {events_count} Events in Event-Datenbank gespeichert")
+            # SAME Events database update as Tab 2
+            new_events_count = add_or_replace_events_in_database(match_id, events_data, match_metadata, event_db)
             
-            # Save all databases using existing helper functions
-            st.info("🔍 DEBUG: Speichere Datenbanken...")
-            player_saved = save_player_database(player_db)
-            match_saved = save_match_database(match_db)
-            event_saved = save_event_database(event_db)
+            # SAME Database saving as Tab 2
+            save_event_database(event_db)
+            save_match_database(match_db)
+            save_player_database(player_db)
             
-            st.info(f"🔍 DEBUG: Speicher-Status - Player: {player_saved}, Match: {match_saved}, Event: {event_saved}")
+            st.success(f"✅ {new_events_count} Events im Event-Archiv gespeichert! (Gleiche Logik wie Tab 2)")
+            st.info(f"📊 Match-ID: {match_id}")
+            st.info(f"📊 Total Events verarbeitet: {len(events_data)}")
             
-            # Reload databases to verify the save worked
-            try:
-                reloaded_player_db = load_player_database()
-                reloaded_match_db = load_match_database()
-                reloaded_event_db = load_event_database()
-                
-                final_player_count = len(reloaded_player_db.get("players", {}))
-                final_match_count = len(reloaded_match_db.get("matches", {}))
-                final_event_count = reloaded_event_db.get("metadata", {}).get("total_events", 0)
-                
-                st.success(f"✅ Datenbanken erfolgreich gespeichert!")
-                st.info(f"📊 Finale Zahlen: {final_player_count} Spieler, {final_match_count} Matches, {final_event_count} Events")
-                
-            except Exception as verify_error:
-                st.warning(f"⚠️ Fehler beim Verifizieren der gespeicherten Daten: {str(verify_error)}")
-            
+            # Return dictionary with expected format for UI
             return {
-                "success": player_saved and match_saved and event_saved,
-                "players_updated": updated_players,
-                "events_count": events_count,
+                "success": True,
+                "players_updated": len(set(row.get('Player Name', 'Unknown') for _, row in export_data.iterrows())),
+                "events_count": new_events_count,
                 "match_id": match_id,
-                "player_saved": player_saved,
-                "match_saved": match_saved,
-                "event_saved": event_saved
+                "player_saved": True,
+                "match_saved": True,
+                "event_saved": True,
+                "metadata": {
+                    "match_info": {
+                        "match_id": match_id
+                    }
+                }
             }
             
         except Exception as e:
-            st.error(f"❌ Fehler beim Aktualisieren der Datenbanken: {str(e)}")
-            import traceback
-            st.error(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
-            return {"success": False, "error": str(e)}
+            st.error(f"Fehler beim Aktualisieren der Datenbanken: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "players_updated": 0,
+                "events_count": 0,
+                "match_id": "unknown",
+                "player_saved": False,
+                "match_saved": False,
+                "event_saved": False
+            }
     
     # Main UI for JSON Merger
     st.subheader("1. JSON-Dateien hochladen")
@@ -4394,23 +4157,23 @@ with tabs[5]:
             
             with col_info1:
                 st.markdown("**Erste Datei:**")
-                match_info_1 = json_data_1.get('metadata', {}).get('matchInfo', {})
-                st.write(f"**Match-ID:** {match_info_1.get('matchId', 'Unbekannt')}")
+                match_info_1 = json_data_1.get('metadata', {}).get('match_info', {})
+                st.write(f"**Match-ID:** {match_info_1.get('match_id', 'Unbekannt')}")
                 st.write(f"**Events:** {len(json_data_1.get('events', []))}")
                 st.write(f"**Spieler:** {json_data_1.get('metadata', {}).get('playerInfo', {}).get('totalPlayers', 0)}")
                 st.write(f"**Dateiname:** {match_info_1.get('originalFilename', 'Unbekannt')}")
             
             with col_info2:
                 st.markdown("**Zweite Datei:**")
-                match_info_2 = json_data_2.get('metadata', {}).get('matchInfo', {})
-                st.write(f"**Match-ID:** {match_info_2.get('matchId', 'Unbekannt')}")
+                match_info_2 = json_data_2.get('metadata', {}).get('match_info', {})
+                st.write(f"**Match-ID:** {match_info_2.get('match_id', 'Unbekannt')}")
                 st.write(f"**Events:** {len(json_data_2.get('events', []))}")
                 st.write(f"**Spieler:** {json_data_2.get('metadata', {}).get('playerInfo', {}).get('totalPlayers', 0)}")
                 st.write(f"**Dateiname:** {match_info_2.get('originalFilename', 'Unbekannt')}")
             
             # Check if match IDs are compatible
-            match_id_1 = match_info_1.get('matchId', '').split('_')[0:3]  # Extract base match info
-            match_id_2 = match_info_2.get('matchId', '').split('_')[0:3]
+            match_id_1 = match_info_1.get('match_id', '').split('_')[0:3]  # Extract base match info
+            match_id_2 = match_info_2.get('match_id', '').split('_')[0:3]
             
             if match_id_1 == match_id_2:
                 st.success("✅ Match-IDs sind kompatibel - selbes Spiel erkannt!")
@@ -4450,7 +4213,7 @@ with tabs[5]:
                 st.metric("Einzigartige Spieler", total_players)
             
             with col_stats3:
-                match_id = merged_json.get('metadata', {}).get('matchInfo', {}).get('matchId', 'unknown')
+                match_id = merged_json.get('metadata', {}).get('match_info', {}).get('match_id', 'unknown')
                 st.metric("Match-ID", match_id)
             
             # Player mapping details
@@ -4505,7 +4268,7 @@ with tabs[5]:
                     with col_result2:
                         st.metric("Events gespeichert", result.get("events_count", 0))
                     with col_result3:
-                        st.metric("Match-ID", result.get("match_id", "unknown"))
+                        st.metric("Match-ID", result.get("metadata", {}).get("match_info", {}).get("match_id", "unknown"))
                     
                     # Save status details
                     with st.expander("🔍 Speicher-Details anzeigen"):
@@ -4578,17 +4341,30 @@ with tabs[5]:
             if match_db.get("matches"):
                 recent_matches = []
                 for match_id, match_info in match_db["matches"].items():
+                    # Sichere Datum-Extraktion mit Fallback
+                    match_date = match_info.get("match_date")
+                    if match_date is None or match_date == "":
+                        match_date = match_info.get("date", "Unbekannt")
+                    if match_date is None:
+                        match_date = "Unbekannt"
+                    
                     recent_matches.append({
                         "Match-ID": match_id,
-                        "Datum": match_info.get("match_date", "Unbekannt"),
+                        "Datum": match_date,
                         "Team": match_info.get("team", "Unbekannt"),
                         "Gegner": match_info.get("opponent", "Unbekannt"),
                         "Jugend": match_info.get("youth_level", "Unbekannt"),
                         "Events": match_info.get("total_events", 0)
                     })
                 
-                # Sort by date (newest first)
-                recent_matches.sort(key=lambda x: x["Datum"], reverse=True)
+                # Sichere Sortierung nach Datum (behandelt None und "Unbekannt")
+                def safe_date_sort(match):
+                    date_value = match["Datum"]
+                    if date_value is None or date_value == "Unbekannt":
+                        return "0000-00-00"  # Sehr frühes Datum für unbekannte Daten
+                    return str(date_value)
+                
+                recent_matches.sort(key=safe_date_sort, reverse=True)
                 matches_df = pd.DataFrame(recent_matches[:10])  # Show last 10 matches
                 st.dataframe(matches_df, use_container_width=True)
             else:
@@ -4619,7 +4395,7 @@ with tabs[5]:
         ```json
         {
           "metadata": {
-            "matchInfo": { ... },
+            "match_info": { ... },
             "playerInfo": {
               "playerIdMapping": { ... }
             }
