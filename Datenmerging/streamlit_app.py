@@ -1655,6 +1655,7 @@ def create_structured_json_export_with_ids(df):
             "event_id": event_id,
             "timestamp": timestamp,
             "player": player_name,
+            "position": row.get('Position', ''),  # ← FIX: Position als direktes Feld hinzufügen
             "action_type": action_type,
             "start_x": coordinates.get("start_x", 0),
             "start_y": coordinates.get("start_y", 0),
@@ -2671,7 +2672,7 @@ with tabs[2]:
                                 "passed_to_Position": row.get('passed_to_Position')
                             }
                             
-                            # Clean additional_data - remove coordinates, passing info, and redundant data (SAME as Tab 2)
+                            # Clean additional_data - remove coordinates, passing info, and redundant data
                             additional_data = {}
                             for col, value in row.items():
                                 if col not in ['Zeit', 'Team', 'Halbzeit', 'Player Name', 'passed_from', 'passed_to', 
@@ -2679,14 +2680,14 @@ with tabs[2]:
                                              'Outcome', 'Aktionstyp', 'Position'] and pd.notna(value):
                                     additional_data[col] = str(value) if not isinstance(value, (int, float, bool)) else value
                             
-                            # Determine action_type (SAME as Tab 2)
+                            # Determine action_type
                             action_type = row.get('Aktionstyp', 'Pass')
                             if isinstance(action_type, str):
                                 action_type = action_type.upper()
                             if action_type != "PASS" and action_type != "LOSS":
                                 action_type = "PASS"
                             
-                            # Generate consistent event ID using timestamp and youth level (SAME as Tab 2)
+                            # Generate consistent event ID using timestamp and youth level
                             timestamp = row.get('Zeit', 0)
                             match_entry = match_db["matches"].get(match_id, {})
                             youth_level = extract_youth_level_from_match_info(match_entry)
@@ -2697,6 +2698,7 @@ with tabs[2]:
                                 "event_id": event_id,
                                 "timestamp": timestamp,
                                 "player": player_name,
+                                "position": row.get('Position', ''),  # ← FIX: Position als direktes Feld hinzufügen
                                 "action_type": action_type,
                                 "start_x": start_x,  # ← FIX: Direkt aus DataFrame statt coordinates dict
                                 "start_y": start_y,  # ← FIX: Direkt aus DataFrame
@@ -3721,9 +3723,13 @@ with tabs[5]:
             st.error(f"Zweite JSON-Datei: {msg2}")
             return None
         
-        # Extract match IDs to verify they're the same match
-        match_id_1 = json1.get('match_info', {}).get('match_id', 'unknown_1')
-        match_id_2 = json2.get('match_info', {}).get('match_id', 'unknown_2')
+        # Extract match IDs to verify they're the same match - FIX: Use correct path
+        # Try both possible locations for match_info
+        match_info_1 = json1.get('metadata', {}).get('match_info', {}) or json1.get('match_info', {})
+        match_info_2 = json2.get('metadata', {}).get('match_info', {}) or json2.get('match_info', {})
+        
+        match_id_1 = match_info_1.get('match_id', 'unknown_1')
+        match_id_2 = match_info_2.get('match_id', 'unknown_2')
         
         # Create merged structure
         merged_json = {
@@ -3735,8 +3741,8 @@ with tabs[5]:
                     "version": "2.0",
                     "format": "structured_football_data_merged",
                     "originalFiles": [
-                        json1.get('metadata', {}).get('match_info', {}),
-                        json2.get('metadata', {}).get('match_info', {})
+                        match_info_1,
+                        match_info_2
                     ]
                 },
                 "match_info": {},
@@ -3748,17 +3754,19 @@ with tabs[5]:
             "events": []
         }
         
-        # Merge match info (prefer first half's basic info, but combine specific details)
-        match_info_1 = json1.get('match_info', {})
-        match_info_2 = json2.get('match_info', {})
-        
+        # Merge match info (prefer first half's basic info, but combine specific details) - FIX: Use extracted match_info
         merged_match_info = match_info_1.copy()
         merged_match_info.update({
             "timestamp": datetime.now().isoformat(),
             "totalEvents": len(json1.get('events', [])) + len(json2.get('events', [])),
             "dataSource": "merged_halves"
-            
         })
+        
+        # Ensure match_id is properly set in the merged result
+        if match_id_1 != 'unknown_1':
+            merged_match_info['match_id'] = match_id_1
+        elif match_id_2 != 'unknown_2':
+            merged_match_info['match_id'] = match_id_2
         
         merged_json["metadata"]["match_info"] = merged_match_info
         
@@ -3893,7 +3901,7 @@ with tabs[5]:
                     'Y2': end_y,    # ← FIX: Direkt aus Event
                     'Outcome': event.get("outcome", ''),        # ← FIX: Direkt aus Event
                     'Aktionstyp': event.get("action_type", 'Pass'), # ← FIX: Direkt aus Event
-                    'Position': '',  # ← Position wird nicht im JSON gespeichert
+                    'Position': event.get("position", ''),      # ← FIX: Position direkt aus Event extrahieren
                     'passed_from': passing_network.get('passed_from', ''),     # ← FIX: Aus passing_network
                     'passed_to': passing_network.get('passed_to', ''),         # ← FIX: Aus passing_network
                     'passed_from_Position': passing_network.get('passed_from_Position', ''), # ← FIX: Aus passing_network
@@ -4030,6 +4038,7 @@ with tabs[5]:
                     "event_id": event_id,
                     "timestamp": timestamp,
                     "player": player_name,
+                    "position": row.get('Position', ''),  # ← FIX: Position als direktes Feld hinzufügen
                     "action_type": action_type,
                     "start_x": start_x,  # ← FIX: Direkt aus DataFrame statt coordinates dict
                     "start_y": start_y,  # ← FIX: Direkt aus DataFrame
