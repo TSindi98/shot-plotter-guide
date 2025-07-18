@@ -166,6 +166,322 @@ def add_position_to_dataframe(df, position_mapping):
     return result_df
 
 # ================================================================================
+# ZEITBASIERTES POSITIONSMAPPING SYSTEM
+# ================================================================================
+
+@dataclass
+class TimeBasedPositionMapping:
+    """Klasse für zeitbasierte Positionsmappings"""
+    start_time: float
+    end_time: float
+    mapping: dict
+    name: str = ""
+    
+    def is_active_at_time(self, time: float) -> bool:
+        """Prüft ob dieses Mapping zur gegebenen Zeit aktiv ist"""
+        return self.start_time <= time <= self.end_time
+    
+    def __str__(self):
+        return f"{self.name} ({self.start_time:.1f}s - {self.end_time:.1f}s)"
+
+def create_temporal_position_mapping_interface(unique_players, existing_mappings=None):
+    """Erstellt eine Streamlit-Oberfläche für zeitbasierte Positionsmappings
+    
+    Args:
+        unique_players: Liste der einzigartigen Spielernamen
+        existing_mappings: Liste bestehender TimeBasedPositionMapping Objekte
+        
+    Returns:
+        list: Liste von TimeBasedPositionMapping Objekten
+    """
+    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', '6er', '8er', '10er', 'RM', 'LM', 'LF', 'RF', 'ST']
+    
+    st.subheader("⏰ Zeitbasiertes Spieler-Position Mapping")
+    st.markdown("""
+    **Für Ein-/Auswechslungen und Positionswechsel während des Spiels**
+    
+    Erstellen Sie mehrere Positionsmappings für verschiedene Zeitbereiche. 
+    Das System wählt automatisch das richtige Mapping basierend auf der Zeit jedes Events.
+    """)
+    
+    # Initialisiere mappings falls nicht vorhanden
+    if existing_mappings is None:
+        existing_mappings = []
+    
+    # Zeige bestehende Mappings
+    if existing_mappings:
+        st.subheader("📋 Bestehende Mappings")
+        for i, mapping in enumerate(existing_mappings):
+            with st.expander(f"🕐 {mapping.name} ({mapping.start_time:.1f}s - {mapping.end_time:.1f}s)"):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    mapping_df = pd.DataFrame([
+                        {'Spieler': player, 'Position': position} 
+                        for player, position in mapping.mapping.items()
+                    ])
+                    if not mapping_df.empty:
+                        st.dataframe(mapping_df, use_container_width=True)
+                    else:
+                        st.info("Keine Positionen zugeordnet")
+                
+                with col2:
+                    if st.button("🗑️ Löschen", key=f"delete_mapping_{i}"):
+                        existing_mappings.pop(i)
+                        st.rerun()
+    
+    # Neues Mapping hinzufügen
+    st.subheader("➕ Neues Mapping hinzufügen")
+    
+    with st.form("new_temporal_mapping"):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            mapping_name = st.text_input(
+                "Mapping Name:",
+                value=f"Mapping {len(existing_mappings) + 1}",
+                help="Z.B. 'Startaufstellung', 'Nach Auswechslung Minute 60'"
+            )
+        
+        with col2:
+            start_time = st.number_input(
+                "Startzeit (Sekunden):",
+                min_value=0.0,
+                step=1.0,
+                value=0.0 if not existing_mappings else max([m.end_time for m in existing_mappings]),
+                help="Ab welcher Zeit gilt dieses Mapping?"
+            )
+        
+        with col3:
+            end_time = st.number_input(
+                "Endzeit (Sekunden):",
+                min_value=start_time,
+                step=1.0,
+                value=start_time + 300.0,  # Default: 5 Minuten
+                help="Bis zu welcher Zeit gilt dieses Mapping?"
+            )
+        
+        # Positionsmapping für diesen Zeitbereich
+        st.subheader(f"Positionen für Zeitbereich {start_time:.1f}s - {end_time:.1f}s")
+        
+        position_mapping = {}
+        cols_per_row = 3
+        
+        for i in range(0, len(unique_players), cols_per_row):
+            cols = st.columns(cols_per_row)
+            
+            for j, col in enumerate(cols):
+                if i + j < len(unique_players):
+                    player = unique_players[i + j]
+                    with col:
+                        # Prüfe ob es eine Vorlage aus vorherigen Mappings gibt
+                        default_position = 'Auswählen...'
+                        for existing_mapping in reversed(existing_mappings):  # Neueste zuerst
+                            if player in existing_mapping.mapping:
+                                default_position = existing_mapping.mapping[player]
+                                break
+                        
+                        # Setze Index für default_position
+                        options = ['Auswählen...'] + available_positions
+                        default_index = 0
+                        if default_position in options:
+                            default_index = options.index(default_position)
+                        
+                        position = st.selectbox(
+                            f"Position für {player}:",
+                            options=options,
+                            index=default_index,
+                            key=f"temporal_position_{player}_{len(existing_mappings)}"
+                        )
+                        
+                        if position != 'Auswählen...':
+                            position_mapping[player] = position
+        
+        submitted = st.form_submit_button("✅ Mapping hinzufügen")
+        
+        if submitted:
+            if mapping_name.strip() and position_mapping:
+                # Validiere Zeitbereich
+                overlap_warnings = []
+                for existing_mapping in existing_mappings:
+                    if not (end_time <= existing_mapping.start_time or start_time >= existing_mapping.end_time):
+                        overlap_warnings.append(f"⚠️ Überschneidung mit '{existing_mapping.name}'")
+                
+                if overlap_warnings:
+                    st.warning("\n".join(overlap_warnings) + "\n\n💡 Überschneidungen sind erlaubt, aber das neueste Mapping hat Priorität.")
+                
+                # Erstelle neues Mapping
+                new_mapping = TimeBasedPositionMapping(
+                    start_time=start_time,
+                    end_time=end_time,
+                    mapping=position_mapping,
+                    name=mapping_name.strip()
+                )
+                
+                existing_mappings.append(new_mapping)
+                st.success(f"✅ Mapping '{mapping_name}' für {len(position_mapping)} Spieler hinzugefügt!")
+                st.rerun()
+                
+            elif not mapping_name.strip():
+                st.error("❌ Bitte geben Sie einen Namen für das Mapping ein.")
+            elif not position_mapping:
+                st.error("❌ Bitte ordnen Sie mindestens einem Spieler eine Position zu.")
+    
+    # Übersicht aller Mappings
+    if existing_mappings:
+        st.subheader("📊 Mapping-Übersicht")
+        
+        # Timeline-Visualisierung
+        timeline_data = []
+        for mapping in existing_mappings:
+            timeline_data.append({
+                'Mapping': mapping.name,
+                'Start (s)': mapping.start_time,
+                'Ende (s)': mapping.end_time,
+                'Dauer (s)': mapping.end_time - mapping.start_time,
+                'Spieler': len(mapping.mapping)
+            })
+        
+        timeline_df = pd.DataFrame(timeline_data)
+        timeline_df = timeline_df.sort_values('Start (s)')
+        st.dataframe(timeline_df, use_container_width=True)
+        
+        # Zeige Zeitlücken und Überschneidungen
+        sorted_mappings = sorted(existing_mappings, key=lambda x: x.start_time)
+        
+        gaps = []
+        overlaps = []
+        
+        for i in range(len(sorted_mappings)):
+            current = sorted_mappings[i]
+            
+            # Prüfe Lücken
+            if i > 0:
+                previous = sorted_mappings[i-1]
+                if previous.end_time < current.start_time:
+                    gaps.append(f"⚠️ Lücke zwischen '{previous.name}' und '{current.name}': {previous.end_time:.1f}s - {current.start_time:.1f}s")
+            
+            # Prüfe Überschneidungen
+            for j in range(i+1, len(sorted_mappings)):
+                other = sorted_mappings[j]
+                if not (current.end_time <= other.start_time or current.start_time >= other.end_time):
+                    overlaps.append(f"⚠️ Überschneidung: '{current.name}' und '{other.name}'")
+        
+        if gaps:
+            st.warning("**Zeitlücken gefunden:**\n" + "\n".join(gaps))
+        
+        if overlaps:
+            st.info("**Überschneidungen gefunden:**\n" + "\n".join(overlaps) + 
+                   "\n\n💡 Bei Überschneidungen wird das zuletzt erstellte Mapping verwendet.")
+        
+        if not gaps and not overlaps:
+            st.success("✅ Alle Zeitbereiche sind lückenlos abgedeckt!")
+    
+    return existing_mappings
+
+def apply_temporal_position_mappings(df, temporal_mappings):
+    """Wendet zeitbasierte Positionsmappings auf DataFrame an
+    
+    Args:
+        df: DataFrame mit Spielerdaten (muss 'Zeit' Spalte haben)
+        temporal_mappings: Liste von TimeBasedPositionMapping Objekten
+        
+    Returns:
+        DataFrame: DataFrame mit hinzugefügten Position-Spalten basierend auf Zeit
+    """
+    if not temporal_mappings:
+        st.warning("⚠️ Keine zeitbasierten Mappings vorhanden. Verwende Standard-Mapping.")
+        return df
+    
+    if 'Zeit' not in df.columns:
+        st.error("❌ 'Zeit' Spalte nicht gefunden. Zeitbasiertes Mapping nicht möglich.")
+        return df
+    
+    # Erstelle eine Kopie des DataFrames
+    result_df = df.copy()
+    
+    # Initialisiere Position-Spalten
+    result_df['Position'] = None
+    result_df['passed_from_Position'] = None
+    result_df['passed_to_Position'] = None
+    result_df['Position_Mapping_Used'] = None  # Debug-Info: welches Mapping verwendet wurde
+    
+    # Sortiere Mappings nach Erstellungszeit (neueste zuerst für Priorität)
+    sorted_mappings = sorted(temporal_mappings, key=lambda x: temporal_mappings.index(x), reverse=True)
+    
+    # Statistiken für Logging
+    mapping_usage_stats = {mapping.name: 0 for mapping in temporal_mappings}
+    unmapped_events = 0
+    
+    # Wende Mappings für jede Zeile an
+    for idx, row in result_df.iterrows():
+        event_time = row['Zeit']
+        
+        # Finde das passende Mapping für diese Zeit (neuestes hat Priorität bei Überschneidungen)
+        active_mapping = None
+        for mapping in sorted_mappings:
+            if mapping.is_active_at_time(event_time):
+                active_mapping = mapping
+                break
+        
+        if active_mapping:
+            # Füge Position für Player Name hinzu
+            if 'Player Name' in result_df.columns:
+                player_name = row['Player Name']
+                if pd.notna(player_name) and player_name in active_mapping.mapping:
+                    result_df.at[idx, 'Position'] = active_mapping.mapping[player_name]
+            
+            # Füge Position für passed_from hinzu
+            if 'passed_from' in result_df.columns:
+                passed_from_player = row['passed_from']
+                if pd.notna(passed_from_player) and passed_from_player in active_mapping.mapping:
+                    result_df.at[idx, 'passed_from_Position'] = active_mapping.mapping[passed_from_player]
+            
+            # Füge Position für passed_to hinzu
+            if 'passed_to' in result_df.columns:
+                passed_to_player = row['passed_to']
+                if pd.notna(passed_to_player) and passed_to_player in active_mapping.mapping:
+                    result_df.at[idx, 'passed_to_Position'] = active_mapping.mapping[passed_to_player]
+            
+            # Debug-Info speichern
+            result_df.at[idx, 'Position_Mapping_Used'] = active_mapping.name
+            mapping_usage_stats[active_mapping.name] += 1
+        else:
+            # Kein passendes Mapping gefunden
+            result_df.at[idx, 'Position_Mapping_Used'] = 'KEIN_MAPPING'
+            unmapped_events += 1
+    
+    # Zeige Anwendungsstatistiken
+    st.subheader("📈 Mapping-Anwendungsstatistiken")
+    
+    stats_data = []
+    for mapping_name, usage_count in mapping_usage_stats.items():
+        if usage_count > 0:
+            stats_data.append({
+                'Mapping': mapping_name,
+                'Verwendete Events': usage_count,
+                'Prozent': f"{usage_count / len(result_df) * 100:.1f}%"
+            })
+    
+    if unmapped_events > 0:
+        stats_data.append({
+            'Mapping': 'KEIN MAPPING GEFUNDEN',
+            'Verwendete Events': unmapped_events,
+            'Prozent': f"{unmapped_events / len(result_df) * 100:.1f}%"
+        })
+    
+    if stats_data:
+        stats_df = pd.DataFrame(stats_data)
+        st.dataframe(stats_df, use_container_width=True)
+        
+        if unmapped_events > 0:
+            st.warning(f"⚠️ {unmapped_events} Events konnten keinem Mapping zugeordnet werden. "
+                      f"Prüfen Sie die Zeitbereiche Ihrer Mappings.")
+    else:
+        st.error("❌ Keine Events konnten gemappt werden. Prüfen Sie Ihre Mappings und Zeitbereiche.")
+    
+    return result_df
+
+# ================================================================================
 # XML DATA CLASSES UND PARSER
 # ================================================================================
 
@@ -554,9 +870,16 @@ def add_passed_to_and_from_column(possession_df, xml_events_df):
     
     return updated_possession_df
 
-def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
+def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0, include_unmatched=False):
     """Führt Shot-Plotter-Daten und Possession-Daten anhand der Zeit zusammen
     mit einem flexiblen Zeitfenster für das bestmögliche Matching.
+    
+    Args:
+        shot_plotter_df: DataFrame mit manuell getaggten Daten aus CSV
+        possession_df: DataFrame mit Trackingsystem-Daten
+        time_window: Zeitfenster für das Matching in Sekunden
+        include_unmatched: Wenn True, werden auch ungematchte CSV-Einträge behalten
+                          (mit None-Werten für Trackingsystem-Daten)
     
     Benötigte Spalten im finalen Ergebnis:
     - Name (Player Name aus Possession Summary)
@@ -579,24 +902,24 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
     
     if shot_plotter_df.empty or possession_df.empty:
         return pd.DataFrame()
-    
+
     # Stelle sicher, dass erforderliche Spalten vorhanden sind
     if 'Time' not in shot_plotter_df.columns:
         st.error("Die Shot-Plotter-Datei enthält keine 'Time'-Spalte.")
         return pd.DataFrame()
-    
+
     if 'end_time_sec' not in possession_df.columns:
         st.error("Die verarbeiteten Possession-Daten enthalten keine 'end_time_sec'-Spalte.")
         return pd.DataFrame()
-    
+
     # Konvertiere Zeitwerte zu float, um Typprobleme zu vermeiden
     shot_plotter_df['Time'] = pd.to_numeric(shot_plotter_df['Time'], errors='coerce')
     possession_df['end_time_sec'] = pd.to_numeric(possession_df['end_time_sec'], errors='coerce')
-    
+
     # Entferne Zeilen mit ungültigen Zeitwerten
     shot_plotter_df = shot_plotter_df.dropna(subset=['Time'])
     possession_df = possession_df.dropna(subset=['end_time_sec'])
-    
+
     # Finde die "Possession Type" Spalte
     possession_type_col = None
     for col in possession_df.columns:
@@ -605,7 +928,7 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
             if debug_mode:
                 st.success(f"Gefundene Possession Type Spalte: {col}")
             break
-    
+
     # Finde die "Player Name" Spalte
     player_name_col = None
     for col in possession_df.columns:
@@ -614,7 +937,7 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
             if debug_mode:
                 st.success(f"Gefundene Player Name Spalte: {col}")
             break
-    
+
     # Debug: Zeige alle verfügbaren Spalten in Possession-Daten
     if debug_mode:
         st.subheader("Debug: Verfügbare Spalten in Possession-Daten")
@@ -643,7 +966,7 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                     st.write(f"'{col}': {sample_values}")
             else:
                 st.error("Keine alternativen Spieler-Spalten gefunden!")
-    
+
     # Wenn keine Player Name Spalte gefunden wurde, versuche Alternativen
     if player_name_col is None:
         # Suche nach alternativen Spaltennamen
@@ -664,17 +987,18 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                     if debug_mode:
                         st.warning(f"Verwende Fallback-Spalte als Player Name: {col}")
                     break
-    
-    
+
+
     # Merged-DataFrame initialisieren
     merged_data = []
     matches_found = 0
     total_entries = len(shot_plotter_df)
     
-    # Tracking für bereits verwendete Possession-Einträge
+    # Tracking für bereits verwendete Possession-Einträge und gematchte Shot-Plotter-Einträge
     used_possession_indices = set()
+    matched_shot_plotter_indices = set()
     duplicate_attempts = 0
-    
+
     # Für jeden Eintrag in Shot-Plotter nach übereinstimmenden Zeiten suchen
     for idx, shot_row in shot_plotter_df.iterrows():
         shot_time = float(shot_row['Time'])  # Zeit in Sekunden, explizite Konvertierung zu float
@@ -710,6 +1034,8 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                 if best_match is not None and best_match_index is not None:
                     # Markiere diesen Possession-Eintrag als verwendet
                     used_possession_indices.add(best_match_index)
+                    # Markiere diesen Shot-Plotter-Eintrag als gematcht
+                    matched_shot_plotter_indices.add(idx)
                     
                     # Erstelle einen kombinierten Eintrag mit den gewünschten Spalten
                     merged_entry = {
@@ -773,14 +1099,57 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
                     if debug_mode:
                         st.warning(f"❌ Kein verfügbarer Match für Shot-Plotter-Zeit {shot_time:.2f}s (alle Kandidaten bereits verwendet)")
             else:
-                # Kein Match gefunden - diesen Eintrag später als unmatched hinzufügen
+                # Kein Match gefunden
                 if debug_mode:
                     st.info(f"🔍 Kein Match im Zeitfenster von {time_window}s für Shot-Plotter-Zeit {shot_time:.2f}s")
         except Exception as e:
             if debug_mode:
                 st.error(f"Fehler beim Verarbeiten von Shot-Entry {idx}: {str(e)}")
             continue
-    
+
+    # Wenn include_unmatched=True, füge ungematchte CSV-Einträge hinzu
+    unmatched_added = 0
+    if include_unmatched:
+        for idx, shot_row in shot_plotter_df.iterrows():
+            if idx not in matched_shot_plotter_indices:
+                # Erstelle Eintrag nur mit CSV-Daten, Playermaker-Daten als None
+                unmatched_entry = {
+                    # Koordinaten aus Shot-Plotter
+                    'X': shot_row['X'],
+                    'Y': shot_row['Y'],
+                    # Zeit aus Shot-Plotter (verwende original Time als Zeit)
+                    'Zeit': float(shot_row['Time'])
+                }
+                
+                # Füge alle neuen Spalten aus Shot-Plotter hinzu
+                new_columns = ['Team', 'Halbzeit', 'Gegnerdruck', 'Outcome', 'Passhöhe', 'Situation', 'Aktionstyp', 'X2', 'Y2']
+                for col in new_columns:
+                    if col in shot_row and pd.notna(shot_row[col]):
+                        unmatched_entry[col] = shot_row[col]
+                
+                # Setze Player Name aus CSV falls vorhanden, sonst "Unbekannter Spieler"
+                if 'Player' in shot_row and pd.notna(shot_row['Player']):
+                    unmatched_entry['Player Name'] = shot_row['Player']
+                elif 'Spieler' in shot_row and pd.notna(shot_row['Spieler']):
+                    unmatched_entry['Player Name'] = shot_row['Spieler']
+                else:
+                    unmatched_entry['Player Name'] = 'Unbekannter Spieler'
+                
+                # Alle Playermaker-spezifischen Felder als None setzen
+                playermaker_fields = [
+                    'passed_from', 'passed_to', 'Possession Type', 
+                    'Receiving Leg', 'Release Foot Zone', 'Release Velocity', 
+                    'Releasing Leg', 'Time to Release'
+                ]
+                for field in playermaker_fields:
+                    unmatched_entry[field] = None
+                
+                merged_data.append(unmatched_entry)
+                unmatched_added += 1
+                
+                if debug_mode:
+                    st.info(f"➕ Unmatched CSV-Eintrag hinzugefügt: Zeit {shot_row['Time']:.2f}s")
+
     # Zusammenfassung
     if merged_data:
         merged_df = pd.DataFrame(merged_data)
@@ -789,6 +1158,9 @@ def merge_data_by_time(shot_plotter_df, possession_df, time_window=3.0):
         
         success_rate = matches_found/total_entries*100
         st.success(f"✅ {matches_found} von {total_entries} Einträgen erfolgreich zusammengeführt ({success_rate:.1f}%)")
+        
+        if include_unmatched and unmatched_added > 0:
+            st.info(f"➕ {unmatched_added} ungematchte CSV-Einträge hinzugefügt (nur CSV-Daten, Playermaker-Daten als None)")
         
         if duplicate_attempts > 0:
             st.info(f"🛡️ {duplicate_attempts} Duplicate-Matches verhindert - jeder Possession-Eintrag wird nur einmal verwendet")
@@ -963,6 +1335,38 @@ def fix_column_names(df):
     
     df.columns = corrected_columns
     return df
+
+def extend_merged_data_for_xml_export(merged_data, time_window=3.0):
+    """
+    Erweitert die merged_data um ungematchte CSV-Einträge für den XML-Export.
+    
+    Args:
+        merged_data: DataFrame mit bereits zusammengeführten Daten
+        time_window: Zeitfenster, das beim ursprünglichen Merging verwendet wurde
+    
+    Returns:
+        DataFrame: Erweiterte Daten mit unmatched CSV-Einträgen
+    """
+    # Prüfe ob die benötigten session_state Daten vorhanden sind
+    if ('shot_plotter_df' not in st.session_state or 
+        'possession_df' not in st.session_state or
+        st.session_state.shot_plotter_df.empty):
+        st.warning("Keine CSV-Daten für unmatched Einträge verfügbar.")
+        return merged_data
+    
+    shot_plotter_df = st.session_state.shot_plotter_df
+    possession_df = st.session_state.possession_df
+    
+    # Verwende die gleiche Logik wie merge_data_by_time aber nur für unmatched
+    extended_data = merge_data_by_time(
+        shot_plotter_df, 
+        possession_df, 
+        time_window=time_window, 
+        include_unmatched=True
+    )
+    
+    return extended_data
+
 def create_sportscode_xml(merged_data, player_col=None, time_window=4.0):
     """Erzeugt eine Sportscode-kompatible XML-Datei aus den zusammengeführten Daten
     
@@ -2413,6 +2817,9 @@ with tabs[1]:
                         if sync_enabled:
                             st.session_state.time_diff = time_diff
                         
+                        # Speichere das time_window für spätere Verwendung (z.B. für unmatched XML-Export)
+                        st.session_state.time_window = time_window
+                        
                         st.session_state.merged_data = merged_data
                         st.success(f"Daten erfolgreich zusammengeführt: {len(merged_data)} Einträge")
 
@@ -2496,39 +2903,114 @@ with tabs[2]:
         st.dataframe(merged_data[display_columns])
         
         # Position-Mapping-Sektion
-        st.subheader("Spieler-Position Mapping")
-        st.write("Ordnen Sie jedem Spieler eine Position zu, um diese Information in der finalen Datei zu speichern.")
+        st.subheader("🎯 Spieler-Position Mapping")
+        st.markdown("""
+        **Wählen Sie den Mapping-Modus:**
+        - **Einfaches Mapping**: Ein Mapping für die gesamte Zeit (wie bisher)
+        - **Zeitbasiertes Mapping**: Mehrere Mappings mit Zeitbereichen für Ein-/Auswechslungen
+        """)
         
-        # Extrahiere einzigartige Spieler
-        if st.button("Spieler extrahieren und Position-Mapping starten", key="extract_players_btn"):
+        # Mapping-Modus auswählen
+        mapping_mode = st.radio(
+            "Mapping-Modus wählen:",
+            ["🕐 Zeitbasiertes Mapping (Empfohlen für Ein-/Auswechslungen)", "📝 Einfaches Mapping (Ein Mapping für alles)"],
+            key="mapping_mode_selection",
+            help="Zeitbasiertes Mapping ermöglicht verschiedene Positionen zu verschiedenen Zeiten"
+        )
+        
+        use_temporal_mapping = mapping_mode.startswith("🕐")
+        
+        # Extrahiere einzigartige Spieler Button
+        if st.button("🔍 Spieler extrahieren und Position-Mapping starten", key="extract_players_btn"):
             unique_players = extract_unique_players(merged_data)
             st.info(f"🔍 DEBUG: {len(unique_players)} einzigartige Spieler gefunden: {sorted(list(unique_players))}")
             
             st.session_state.unique_players = unique_players
             st.session_state.show_position_mapping = True
+            st.session_state.use_temporal_mapping = use_temporal_mapping
+            
+            # Initialisiere temporal_mappings falls noch nicht vorhanden
+            if 'temporal_mappings' not in st.session_state:
+                st.session_state.temporal_mappings = []
+            
             st.rerun()
         
         # Zeige Position-Mapping Interface wenn Spieler extrahiert wurden
         if st.session_state.get('show_position_mapping', False) and 'unique_players' in st.session_state:
-            position_mapping = create_position_mapping_interface(st.session_state.unique_players)
             
-            # Speichere das Mapping im session_state
-            st.session_state.position_mapping = position_mapping
+            if st.session_state.get('use_temporal_mapping', False):
+                # ===== ZEITBASIERTES MAPPING =====
+                st.markdown("---")
+                st.markdown("### ⏰ Zeitbasiertes Position-Mapping")
+                
+                # Lade bestehende Mappings
+                existing_mappings = st.session_state.get('temporal_mappings', [])
+                
+                # Erstelle das zeitbasierte Interface
+                updated_mappings = create_temporal_position_mapping_interface(
+                    st.session_state.unique_players, 
+                    existing_mappings
+                )
+                
+                # Speichere die aktualisierten Mappings
+                st.session_state.temporal_mappings = updated_mappings
+                
+                # Button zum Anwenden des zeitbasierten Position-Mappings
+                if updated_mappings and len(updated_mappings) > 0:
+                    if st.button("✅ Zeitbasiertes Position-Mapping anwenden", key="apply_temporal_mapping_btn"):
+                        # Wende zeitbasierte Mappings an
+                        merged_data_with_positions = apply_temporal_position_mappings(merged_data, updated_mappings)
+                        st.session_state.merged_data = merged_data_with_positions
+                        st.session_state.show_position_mapping = False  # Verstecke das Mapping-Interface
+                        st.success(f"✅ Zeitbasierte Positionen erfolgreich angewendet! {len(updated_mappings)} Mapping(s) aktiv.")
+                        st.rerun()
+                else:
+                    st.info("💡 Erstellen Sie mindestens ein zeitbasiertes Mapping um fortzufahren.")
             
-            # Button zum Anwenden des Position-Mappings
-            if position_mapping and len(position_mapping) > 0:
-                if st.button("Position-Mapping anwenden", key="apply_position_mapping_btn"):
-                    # Füge Positionen zum merged_data hinzu
-                    merged_data_with_positions = add_position_to_dataframe(merged_data, position_mapping)
-                    st.session_state.merged_data = merged_data_with_positions
-                    st.session_state.show_position_mapping = False  # Verstecke das Mapping-Interface
-                    st.success(f"Positionen erfolgreich hinzugefügt! {len(position_mapping)} Spieler wurden gemappt.")
-                    st.rerun()
+            else:
+                # ===== EINFACHES MAPPING (Original-System) =====
+                st.markdown("---")
+                st.markdown("### 📝 Einfaches Position-Mapping")
+                st.info("💡 Ein Mapping für die gesamte Zeit. Für Ein-/Auswechslungen verwenden Sie das zeitbasierte Mapping.")
+                
+                position_mapping = create_position_mapping_interface(st.session_state.unique_players)
+                
+                # Speichere das Mapping im session_state
+                st.session_state.position_mapping = position_mapping
+                
+                # Button zum Anwenden des Position-Mappings
+                if position_mapping and len(position_mapping) > 0:
+                    if st.button("✅ Einfaches Position-Mapping anwenden", key="apply_simple_mapping_btn"):
+                        # Füge Positionen zum merged_data hinzu
+                        merged_data_with_positions = add_position_to_dataframe(merged_data, position_mapping)
+                        st.session_state.merged_data = merged_data_with_positions
+                        st.session_state.show_position_mapping = False  # Verstecke das Mapping-Interface
+                        st.success(f"✅ Positionen erfolgreich hinzugefügt! {len(position_mapping)} Spieler wurden gemappt.")
+                        st.rerun()
         
         # Update merged_data reference after potential position mapping
         merged_data = st.session_state.merged_data
         
-    
+        # Zeige Mapping-Informationen wenn vorhanden
+        if 'temporal_mappings' in st.session_state and st.session_state.temporal_mappings:
+            with st.expander("📊 Aktive zeitbasierte Mappings anzeigen"):
+                for i, mapping in enumerate(st.session_state.temporal_mappings):
+                    st.write(f"**{mapping.name}** ({mapping.start_time:.1f}s - {mapping.end_time:.1f}s)")
+                    st.write(f"Positionen: {len(mapping.mapping)} Spieler")
+                    if st.checkbox(f"Details anzeigen", key=f"show_mapping_details_{i}"):
+                        mapping_df = pd.DataFrame([
+                            {'Spieler': player, 'Position': position} 
+                            for player, position in mapping.mapping.items()
+                        ])
+                        st.dataframe(mapping_df, use_container_width=True)
+        
+        elif 'position_mapping' in st.session_state and st.session_state.position_mapping:
+            with st.expander("📊 Aktives einfaches Mapping anzeigen"):
+                mapping_df = pd.DataFrame([
+                    {'Spieler': player, 'Position': position} 
+                    for player, position in st.session_state.position_mapping.items()
+                ])
+                st.dataframe(mapping_df, use_container_width=True)
         
         # Export-Optionen
         st.subheader("Daten exportieren")
@@ -2957,9 +3439,28 @@ with tabs[2]:
                     help="Definiert das Zeitfenster vor und nach dem Event (start = Zeit - Fenster, end = Zeit + Fenster)"
                 )
                 
+                # Option für ungematchte CSV-Einträge
+                include_unmatched_xml = st.checkbox(
+                    "Ungematchte CSV-Einträge einbeziehen",
+                    value=True,
+                    help="Wenn aktiviert, werden auch Pässe aus der CSV-Datei exportiert, die kein Match mit dem Trackingsystem finden. Playermaker-Daten werden als leer/None dargestellt."
+                )
+                
+                # Bestimme welche Daten für XML verwendet werden sollen
+                xml_data = merged_data
+                if include_unmatched_xml:
+                    # Verwende das aktuelle time_window aus dem session_state falls verfügbar
+                    merge_time_window = st.session_state.get('time_window', 3.0)
+                    xml_data = extend_merged_data_for_xml_export(merged_data, time_window=merge_time_window)
+                    
+                    # Zeige Information über hinzugefügte Einträge
+                    unmatched_count = len(xml_data) - len(merged_data)
+                    if unmatched_count > 0:
+                        st.info(f"➕ {unmatched_count} ungematchte CSV-Einträge wurden für den XML-Export hinzugefügt")
+                
                 # Funktion mit angepassten Optionen aufrufen
                 sportscode_xml = create_sportscode_xml(
-                    merged_data, 
+                    xml_data, 
                     player_col=xml_player_col, 
                     time_window=xml_time_window
                 )
@@ -2980,7 +3481,7 @@ with tabs[2]:
                     
                     if sample_entry:
                         st.code(sample_entry, language="xml")
-                        st.info(f"Dies ist eine Vorschau einer einzelnen Instanz. Die vollständige XML enthält {merged_data.shape[0]} Instanzen.")
+                        st.info(f"Dies ist eine Vorschau einer einzelnen Instanz. Die vollständige XML enthält {xml_data.shape[0]} Instanzen.")
                     else:
                         st.error("Keine Instanz für die Vorschau gefunden.")
                 
