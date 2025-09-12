@@ -78,7 +78,7 @@ def create_position_mapping_interface(unique_players):
     Returns:
         dict: Dictionary mit Spielername -> Position Mapping
     """
-    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', '6er', '8er', '10er', 'RM', 'LM', 'LF', 'RF', 'ST']
+    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', '6er', '8er_links', '8er_rechts', '10er', 'RM', 'LM', 'LF', 'RF', 'ST']
     
     st.subheader("Spieler-Position Mapping")
     st.write(f"Gefundene Spieler: {len(unique_players)}")
@@ -194,7 +194,7 @@ def create_temporal_position_mapping_interface(unique_players, existing_mappings
     Returns:
         list: Liste von TimeBasedPositionMapping Objekten
     """
-    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', '6er', '8er', '10er', 'RM', 'LM', 'LF', 'RF', 'ST']
+    available_positions = ['TW', 'RV', 'LV', 'LIV', 'RIV', '6er', '8er_links', '8er_rechts', '10er', 'RM', 'LM', 'LF', 'RF', 'ST']
     
     st.subheader("⏰ Zeitbasiertes Spieler-Position Mapping")
     st.markdown("""

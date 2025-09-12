@@ -1,0 +1,1021 @@
+{
+  "1000": {
+    "role": "Schalke",
+    "first_frame": 1,
+    "positions": [
+      {
+        "frame": 1,
+        "x": 176,
+        "y": 273,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "2000": {
+    "role": "BVB",
+    "first_frame": 2,
+    "positions": [
+      {
+        "frame": 2,
+        "x": 829,
+        "y": 766,
+        "role": "BVB"
+      }
+    ]
+  },
+  "3000": {
+    "role": "Schalke",
+    "first_frame": 3,
+    "positions": [
+      {
+        "frame": 3,
+        "x": 1707,
+        "y": 586,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "4000": {
+    "role": "Schalke",
+    "first_frame": 4,
+    "positions": [
+      {
+        "frame": 4,
+        "x": 1708,
+        "y": 587,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "4001": {
+    "role": "Schalke",
+    "first_frame": 4,
+    "positions": [
+      {
+        "frame": 4,
+        "x": 625,
+        "y": 307,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "5000": {
+    "role": "BVB",
+    "first_frame": 5,
+    "positions": [
+      {
+        "frame": 5,
+        "x": 1710,
+        "y": 587,
+        "role": "BVB"
+      }
+    ]
+  },
+  "6000": {
+    "role": "Schalke",
+    "first_frame": 6,
+    "positions": [
+      {
+        "frame": 6,
+        "x": 1710,
+        "y": 586,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "7000": {
+    "role": "BVB",
+    "first_frame": 7,
+    "positions": [
+      {
+        "frame": 7,
+        "x": 1712,
+        "y": 586,
+        "role": "BVB"
+      }
+    ]
+  },
+  "8000": {
+    "role": "Schalke",
+    "first_frame": 8,
+    "positions": [
+      {
+        "frame": 8,
+        "x": 1713,
+        "y": 586,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "9000": {
+    "role": "Schalke",
+    "first_frame": 9,
+    "positions": [
+      {
+        "frame": 9,
+        "x": 1716,
+        "y": 586,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "10000": {
+    "role": "Schalke",
+    "first_frame": 10,
+    "positions": [
+      {
+        "frame": 10,
+        "x": 1718,
+        "y": 586,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "10001": {
+    "role": "BVB",
+    "first_frame": 10,
+    "positions": [
+      {
+        "frame": 10,
+        "x": 537,
+        "y": 357,
+        "role": "BVB"
+      }
+    ]
+  },
+  "10002": {
+    "role": "Schalke",
+    "first_frame": 10,
+    "positions": [
+      {
+        "frame": 10,
+        "x": 616,
+        "y": 309,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "10003": {
+    "role": "BVB",
+    "first_frame": 10,
+    "positions": [
+      {
+        "frame": 10,
+        "x": 814,
+        "y": 331,
+        "role": "BVB"
+      }
+    ]
+  },
+  "11000": {
+    "role": "BVB",
+    "first_frame": 11,
+    "positions": [
+      {
+        "frame": 11,
+        "x": 1721,
+        "y": 586,
+        "role": "BVB"
+      }
+    ]
+  },
+  "12000": {
+    "role": "BVB",
+    "first_frame": 12,
+    "positions": [
+      {
+        "frame": 12,
+        "x": 1722,
+        "y": 586,
+        "role": "BVB"
+      }
+    ]
+  },
+  "13000": {
+    "role": "BVB",
+    "first_frame": 13,
+    "positions": [
+      {
+        "frame": 13,
+        "x": 1723,
+        "y": 583,
+        "role": "BVB"
+      }
+    ]
+  },
+  "14000": {
+    "role": "BVB",
+    "first_frame": 14,
+    "positions": [
+      {
+        "frame": 14,
+        "x": 1724,
+        "y": 583,
+        "role": "BVB"
+      }
+    ]
+  },
+  "15000": {
+    "role": "Schalke",
+    "first_frame": 15,
+    "positions": [
+      {
+        "frame": 15,
+        "x": 1725,
+        "y": 580,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "15001": {
+    "role": "BVB",
+    "first_frame": 15,
+    "positions": [
+      {
+        "frame": 15,
+        "x": 818,
+        "y": 334,
+        "role": "BVB"
+      }
+    ]
+  },
+  "16000": {
+    "role": "Schiedsrichter",
+    "first_frame": 16,
+    "positions": [
+      {
+        "frame": 16,
+        "x": 1726,
+        "y": 580,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "16001": {
+    "role": "BVB",
+    "first_frame": 16,
+    "positions": []
+  },
+  "17000": {
+    "role": "Torwart",
+    "first_frame": 17,
+    "positions": [
+      {
+        "frame": 17,
+        "x": 1231,
+        "y": 289,
+        "role": "Torwart"
+      }
+    ]
+  },
+  "17001": {
+    "role": "Torwart",
+    "first_frame": 17,
+    "positions": [
+      {
+        "frame": 17,
+        "x": 113,
+        "y": 282,
+        "role": "Torwart"
+      }
+    ]
+  },
+  "18000": {
+    "role": "BVB",
+    "first_frame": 18,
+    "positions": [
+      {
+        "frame": 18,
+        "x": 924,
+        "y": 769,
+        "role": "BVB"
+      }
+    ]
+  },
+  "18001": {
+    "role": "BVB",
+    "first_frame": 18,
+    "positions": [
+      {
+        "frame": 18,
+        "x": 656,
+        "y": 596,
+        "role": "BVB"
+      }
+    ]
+  },
+  "19000": {
+    "role": "Schalke",
+    "first_frame": 19,
+    "positions": [
+      {
+        "frame": 19,
+        "x": 1729,
+        "y": 578,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "20000": {
+    "role": "BVB",
+    "first_frame": 20,
+    "positions": [
+      {
+        "frame": 20,
+        "x": 1732,
+        "y": 578,
+        "role": "BVB"
+      }
+    ]
+  },
+  "20001": {
+    "role": "Schalke",
+    "first_frame": 20,
+    "positions": [
+      {
+        "frame": 20,
+        "x": 1698,
+        "y": 897,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "21000": {
+    "role": "BVB",
+    "first_frame": 21,
+    "positions": [
+      {
+        "frame": 21,
+        "x": 1733,
+        "y": 578,
+        "role": "BVB"
+      }
+    ]
+  },
+  "21001": {
+    "role": "Schalke",
+    "first_frame": 21,
+    "positions": []
+  },
+  "21002": {
+    "role": "Schalke",
+    "first_frame": 21,
+    "positions": [
+      {
+        "frame": 21,
+        "x": 1699,
+        "y": 896,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "23000": {
+    "role": "BVB",
+    "first_frame": 23,
+    "positions": [
+      {
+        "frame": 23,
+        "x": 1737,
+        "y": 576,
+        "role": "BVB"
+      }
+    ]
+  },
+  "24000": {
+    "role": "Schalke",
+    "first_frame": 24,
+    "positions": [
+      {
+        "frame": 24,
+        "x": 1738,
+        "y": 577,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "24001": {
+    "role": "BVB",
+    "first_frame": 24,
+    "positions": [
+      {
+        "frame": 24,
+        "x": 87,
+        "y": 285,
+        "role": "BVB"
+      }
+    ]
+  },
+  "25000": {
+    "role": "BVB",
+    "first_frame": 25,
+    "positions": [
+      {
+        "frame": 25,
+        "x": 667,
+        "y": 606,
+        "role": "BVB"
+      }
+    ]
+  },
+  "26000": {
+    "role": "Schiedsrichter",
+    "first_frame": 26,
+    "positions": [
+      {
+        "frame": 26,
+        "x": 1744,
+        "y": 574,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "27000": {
+    "role": "Schiedsrichter",
+    "first_frame": 27,
+    "positions": [
+      {
+        "frame": 27,
+        "x": 1745,
+        "y": 574,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "28000": {
+    "role": "Schalke",
+    "first_frame": 28,
+    "positions": []
+  },
+  "28001": {
+    "role": "Schalke",
+    "first_frame": 28,
+    "positions": [
+      {
+        "frame": 28,
+        "x": 1701,
+        "y": 905,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "29000": {
+    "role": "Schiedsrichter",
+    "first_frame": 29,
+    "positions": [
+      {
+        "frame": 29,
+        "x": 1747,
+        "y": 574,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "30000": {
+    "role": "Schalke",
+    "first_frame": 30,
+    "positions": [
+      {
+        "frame": 30,
+        "x": 1747,
+        "y": 575,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "30001": {
+    "role": "Schalke",
+    "first_frame": 30,
+    "positions": []
+  },
+  "30002": {
+    "role": "Schalke",
+    "first_frame": 30,
+    "positions": [
+      {
+        "frame": 30,
+        "x": 1706,
+        "y": 909,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "31000": {
+    "role": "Schalke",
+    "first_frame": 31,
+    "positions": [
+      {
+        "frame": 31,
+        "x": 1748,
+        "y": 576,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "31001": {
+    "role": "Schalke",
+    "first_frame": 31,
+    "positions": [
+      {
+        "frame": 31,
+        "x": 1707,
+        "y": 908,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "32000": {
+    "role": "Schiedsrichter",
+    "first_frame": 32,
+    "positions": [
+      {
+        "frame": 32,
+        "x": 1749,
+        "y": 578,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "32001": {
+    "role": "Schalke",
+    "first_frame": 32,
+    "positions": []
+  },
+  "33000": {
+    "role": "Schalke",
+    "first_frame": 33,
+    "positions": []
+  },
+  "33001": {
+    "role": "Schalke",
+    "first_frame": 33,
+    "positions": [
+      {
+        "frame": 33,
+        "x": 1705,
+        "y": 910,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "33002": {
+    "role": "Schalke",
+    "first_frame": 33,
+    "positions": []
+  },
+  "34000": {
+    "role": "BVB",
+    "first_frame": 34,
+    "positions": [
+      {
+        "frame": 34,
+        "x": 1021,
+        "y": 761,
+        "role": "BVB"
+      }
+    ]
+  },
+  "34001": {
+    "role": "Schalke",
+    "first_frame": 34,
+    "positions": []
+  },
+  "35000": {
+    "role": "BVB",
+    "first_frame": 35,
+    "positions": [
+      {
+        "frame": 35,
+        "x": 552,
+        "y": 469,
+        "role": "BVB"
+      }
+    ]
+  },
+  "35001": {
+    "role": "Schalke",
+    "first_frame": 35,
+    "positions": [
+      {
+        "frame": 35,
+        "x": 1708,
+        "y": 911,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "35002": {
+    "role": "Schalke",
+    "first_frame": 35,
+    "positions": []
+  },
+  "36000": {
+    "role": "Schiedsrichter",
+    "first_frame": 36,
+    "positions": [
+      {
+        "frame": 36,
+        "x": 244,
+        "y": 293,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "36001": {
+    "role": "Schalke",
+    "first_frame": 36,
+    "positions": []
+  },
+  "36002": {
+    "role": "Schalke",
+    "first_frame": 36,
+    "positions": []
+  },
+  "37000": {
+    "role": "BVB",
+    "first_frame": 37,
+    "positions": [
+      {
+        "frame": 37,
+        "x": 1062,
+        "y": 361,
+        "role": "BVB"
+      }
+    ]
+  },
+  "37001": {
+    "role": "Schalke",
+    "first_frame": 37,
+    "positions": []
+  },
+  "38000": {
+    "role": "Schalke",
+    "first_frame": 38,
+    "positions": []
+  },
+  "39000": {
+    "role": "Schalke",
+    "first_frame": 39,
+    "positions": [
+      {
+        "frame": 39,
+        "x": 1711,
+        "y": 916,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "39001": {
+    "role": "Schalke",
+    "first_frame": 39,
+    "positions": []
+  },
+  "40000": {
+    "role": "Schalke",
+    "first_frame": 40,
+    "positions": [
+      {
+        "frame": 40,
+        "x": 1716,
+        "y": 917,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "40001": {
+    "role": "Schalke",
+    "first_frame": 40,
+    "positions": []
+  },
+  "41000": {
+    "role": "Schalke",
+    "first_frame": 41,
+    "positions": [
+      {
+        "frame": 41,
+        "x": 1759,
+        "y": 568,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "42000": {
+    "role": "BVB",
+    "first_frame": 42,
+    "positions": [
+      {
+        "frame": 42,
+        "x": 1073,
+        "y": 757,
+        "role": "BVB"
+      }
+    ]
+  },
+  "43000": {
+    "role": "Schiedsrichter",
+    "first_frame": 43,
+    "positions": [
+      {
+        "frame": 43,
+        "x": 1761,
+        "y": 571,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "44000": {
+    "role": "Schalke",
+    "first_frame": 44,
+    "positions": [
+      {
+        "frame": 44,
+        "x": 1714,
+        "y": 922,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "45000": {
+    "role": "Schiedsrichter",
+    "first_frame": 45,
+    "positions": [
+      {
+        "frame": 45,
+        "x": 1761,
+        "y": 574,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "46000": {
+    "role": "Schiedsrichter",
+    "first_frame": 46,
+    "positions": [
+      {
+        "frame": 46,
+        "x": 1762,
+        "y": 571,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "46001": {
+    "role": "BVB",
+    "first_frame": 46,
+    "positions": [
+      {
+        "frame": 46,
+        "x": 547,
+        "y": 475,
+        "role": "BVB"
+      }
+    ]
+  },
+  "47000": {
+    "role": "BVB",
+    "first_frame": 47,
+    "positions": [
+      {
+        "frame": 47,
+        "x": 1762,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "48000": {
+    "role": "BVB",
+    "first_frame": 48,
+    "positions": [
+      {
+        "frame": 48,
+        "x": 1763,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "48001": {
+    "role": "Schalke",
+    "first_frame": 48,
+    "positions": []
+  },
+  "48002": {
+    "role": "BVB",
+    "first_frame": 48,
+    "positions": [
+      {
+        "frame": 48,
+        "x": 1117,
+        "y": 758,
+        "role": "BVB"
+      }
+    ]
+  },
+  "49000": {
+    "role": "BVB",
+    "first_frame": 49,
+    "positions": [
+      {
+        "frame": 49,
+        "x": 1763,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "49001": {
+    "role": "Schalke",
+    "first_frame": 49,
+    "positions": [
+      {
+        "frame": 49,
+        "x": 1786,
+        "y": 760,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "50000": {
+    "role": "BVB",
+    "first_frame": 50,
+    "positions": [
+      {
+        "frame": 50,
+        "x": 1765,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "50001": {
+    "role": "Schalke",
+    "first_frame": 50,
+    "positions": [
+      {
+        "frame": 50,
+        "x": 1315,
+        "y": 568,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "50002": {
+    "role": "Schalke",
+    "first_frame": 50,
+    "positions": []
+  },
+  "51000": {
+    "role": "Schalke",
+    "first_frame": 51,
+    "positions": []
+  },
+  "51001": {
+    "role": "Schalke",
+    "first_frame": 51,
+    "positions": [
+      {
+        "frame": 51,
+        "x": 1021,
+        "y": 498,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "51002": {
+    "role": "Schalke",
+    "first_frame": 51,
+    "positions": [
+      {
+        "frame": 51,
+        "x": 1312,
+        "y": 570,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "52000": {
+    "role": "BVB",
+    "first_frame": 52,
+    "positions": [
+      {
+        "frame": 52,
+        "x": 1763,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "52001": {
+    "role": "Schiedsrichter",
+    "first_frame": 52,
+    "positions": [
+      {
+        "frame": 52,
+        "x": 1786,
+        "y": 763,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "52002": {
+    "role": "BVB",
+    "first_frame": 52,
+    "positions": [
+      {
+        "frame": 52,
+        "x": 541,
+        "y": 479,
+        "role": "BVB"
+      }
+    ]
+  },
+  "53000": {
+    "role": "BVB",
+    "first_frame": 53,
+    "positions": [
+      {
+        "frame": 53,
+        "x": 1764,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "53001": {
+    "role": "Schalke",
+    "first_frame": 53,
+    "positions": [
+      {
+        "frame": 53,
+        "x": 1787,
+        "y": 763,
+        "role": "Schalke"
+      }
+    ]
+  },
+  "54000": {
+    "role": "Schiedsrichter",
+    "first_frame": 54,
+    "positions": [
+      {
+        "frame": 54,
+        "x": 1785,
+        "y": 762,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "54001": {
+    "role": "BVB",
+    "first_frame": 54,
+    "positions": [
+      {
+        "frame": 54,
+        "x": 1332,
+        "y": 577,
+        "role": "BVB"
+      }
+    ]
+  },
+  "55000": {
+    "role": "Schiedsrichter",
+    "first_frame": 55,
+    "positions": [
+      {
+        "frame": 55,
+        "x": 1786,
+        "y": 762,
+        "role": "Schiedsrichter"
+      }
+    ]
+  },
+  "55001": {
+    "role": "BVB",
+    "first_frame": 55,
+    "positions": [
+      {
+        "frame": 55,
+        "x": 1766,
+        "y": 571,
+        "role": "BVB"
+      }
+    ]
+  },
+  "55002": {
+    "role": "BVB",
+    "first_frame": 55,
+    "positions": [
+      {
+        "frame": 55,
+        "x": 1164,
+        "y": 764,
+        "role": "BVB"
+      }
+    ]
+  },
+  "55003": {
+    "role": "BVB",
+    "first_frame": 55,
+    "positions": []
+  }
+}

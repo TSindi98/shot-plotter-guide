@@ -74,6 +74,12 @@ def load_individual_events_dataframe(json_file_path):
                 clean_key = key.replace(' ', '_').replace('-', '_')
                 individual_event[f'pass_{clean_key}'] = value
             
+            # Pass Sequence Daten (neue Kategorien)
+            pass_sequence = event.get('pass_sequence', {})
+            individual_event['pass_sequence_id'] = pass_sequence.get('sequence_id', '')
+            individual_event['pass_position_in_sequence'] = pass_sequence.get('position_in_sequence', None)
+            individual_event['pass_sequence_length'] = pass_sequence.get('sequence_length', None)
+            
             # Event zur Liste hinzufügen
             all_individual_events.append(individual_event)
     
@@ -142,6 +148,38 @@ def analyze_individual_events(df):
         print(f"\n🕐 Events pro Halbzeit:")
         half_counts = df['half'].value_counts().sort_index()
         print(half_counts)
+    
+    # Pass Sequence Analyse (nur für PASS Events)
+    if 'pass_sequence_id' in df.columns:
+        pass_events = df[df['action_type'] == 'PASS']
+        if len(pass_events) > 0:
+            print(f"\n🏃 PASS SEQUENCE ANALYSE:")
+            print(f"   • Gesamt Pässe: {len(pass_events):,}")
+            
+            # Pässe mit Sequenz-ID
+            pässe_in_sequenzen = pass_events[pass_events['pass_sequence_id'] != '']
+            print(f"   • Pässe in Sequenzen: {len(pässe_in_sequenzen):,} ({len(pässe_in_sequenzen)/len(pass_events)*100:.1f}%)")
+            print(f"   • Einzelpässe: {len(pass_events) - len(pässe_in_sequenzen):,} ({(len(pass_events) - len(pässe_in_sequenzen))/len(pass_events)*100:.1f}%)")
+            
+            # Anzahl verschiedener Sequenzen
+            unique_sequences = pässe_in_sequenzen['pass_sequence_id'].nunique()
+            print(f"   • Verschiedene Sequenzen: {unique_sequences:,}")
+            
+            # Sequenz-Längen Verteilung
+            if 'pass_sequence_length' in df.columns:
+                sequence_lengths = pässe_in_sequenzen['pass_sequence_length'].value_counts().sort_index()
+                print(f"   • Sequenz-Längen Verteilung:")
+                for length, count in sequence_lengths.head(10).items():
+                    print(f"     - {length} Pässe: {count:,} Sequenzen")
+                if len(sequence_lengths) > 10:
+                    print(f"     - ... und {len(sequence_lengths) - 10} weitere Längen")
+            
+            # Top Sequenzen (nach Anzahl Pässe)
+            if 'pass_sequence_id' in df.columns and 'pass_sequence_length' in df.columns:
+                top_sequences = pässe_in_sequenzen.groupby('pass_sequence_id')['pass_sequence_length'].first().nlargest(5)
+                print(f"   • Top 5 längste Sequenzen:")
+                for seq_id, length in top_sequences.items():
+                    print(f"     - {seq_id}: {length} Pässe")
 
 def main():
     """
@@ -182,6 +220,12 @@ def main():
    events_df[events_df['outcome'] == 'Erfolgreich']           # Nur erfolgreiche Events
    events_df[events_df['match_id'] == 'U12_BVB-BMG_2023-11-04']  # Events eines Matches
    
+   # Pass Sequence Filter
+   events_df[events_df['pass_sequence_id'] != '']             # Pässe in Sequenzen
+   events_df[events_df['pass_sequence_id'] == '']             # Einzelpässe
+   events_df[events_df['pass_sequence_length'] == 5]          # Sequenzen mit 5 Pässen
+   events_df[events_df['pass_position_in_sequence'] == 1]     # Erste Pässe in Sequenzen
+   
    # Sortieren
    events_df.sort_values('timestamp')                         # Nach Zeit sortieren
    events_df.sort_values(['match_id', 'timestamp'])           # Nach Match und Zeit
@@ -189,6 +233,11 @@ def main():
    # Spieler-spezifische Analysen
    events_df[events_df['player'] == 'Spielername']['action_type'].value_counts()
    events_df.groupby('player')['outcome'].apply(lambda x: (x=='Erfolgreich').mean()*100)
+   
+   # Pass Sequence Analysen
+   events_df[events_df['action_type'] == 'PASS']['pass_sequence_id'].value_counts()  # Häufigste Sequenzen
+   events_df[events_df['action_type'] == 'PASS'].groupby('pass_sequence_id')['pass_sequence_length'].first().value_counts()  # Sequenz-Längen
+   events_df[(events_df['action_type'] == 'PASS') & (events_df['pass_sequence_id'] != '')]['pass_position_in_sequence'].value_counts()  # Positionen in Sequenzen
    
    # Match-spezifische Analysen
    events_df[events_df['match_id'] == 'Match_ID']['action_type'].value_counts()
