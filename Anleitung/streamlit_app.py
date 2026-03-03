@@ -153,6 +153,7 @@ st.sidebar.markdown('<p style="font-size: 1.2em; font-weight: bold; color: #ffc4
 page = st.sidebar.radio(
     "Navigation",
     [
+        "0. Quick Start (Online)",
         "1. Installation (Docker)",
         "2. User Interface",
         "3. Basic Functions",
@@ -166,15 +167,65 @@ page = st.sidebar.radio(
 
 
 # =============================================================================
+# PAGE 0: QUICK START (ONLINE)
+# =============================================================================
+
+if page == "0. Quick Start (Online)":
+    st.title("Quick Start - Use Online")
+
+    st.success("""
+    **Good news!** You can use the Shot-Plotter directly in your browser - no installation required!
+    """)
+
+    st.header("Open the App")
+
+    st.markdown("""
+    Simply click the link below to start using the Shot-Plotter immediately:
+
+    ### [Open Shot-Plotter](https://tagging-app.netlify.app/html/)
+
+    The app runs entirely in your browser. Your data is saved locally in your browser's storage.
+    """)
+
+    st.markdown("---")
+
+    st.header("When to Use Docker Instead?")
+
+    st.markdown("""
+    The online version is perfect for most users. However, you might want to use the **Docker version** if:
+
+    - You need to work **offline** (no internet connection)
+    - You want to run the app on a **local server**
+    - You prefer to have the app **installed locally**
+
+    If you need the offline version, continue to **1. Installation (Docker)** in the navigation.
+    """)
+
+    st.markdown("---")
+
+    st.header("Browser Recommendation")
+
+    st.info("""
+    **Recommended browsers:** Safari or Firefox
+
+    Chrome may cause issues with arrow keys or keyboard shortcuts.
+    """)
+
+# =============================================================================
 # PAGE 1: INSTALLATION (DOCKER)
 # =============================================================================
 
-if page == "1. Installation (Docker)":
-    st.title("Installation with Docker Desktop")
+elif page == "1. Installation (Docker)":
+    st.title("Installation with Docker Desktop (Offline)")
 
     st.markdown("""
-    This guide shows you how to install and start the Shot-Plotter using Docker Desktop.
-    Docker allows you to run the application on any computer without complicated setup.
+    This guide shows you how to install the Shot-Plotter locally using Docker Desktop.
+    Use this if you need to work **offline** or want the app installed on your computer.
+    """)
+
+    st.info("""
+    **Tip:** If you just want to use the app, you don't need Docker!
+    Simply use the [online version](https://tagging-app.netlify.app/html/) instead.
     """)
 
     # Step 1
